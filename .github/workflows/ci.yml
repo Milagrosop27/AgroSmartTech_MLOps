@@ -1,0 +1,30 @@
+name: MLOps Integración Continua (CI)
+
+# -- cuando se va a ejecutar este workflow 
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# -- los trabajos que se van a ejecutar
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Descarga el código de tu repositorio
+      - name: Descargar el código
+        uses: actions/checkout@v3
+
+      # 2. Revisa que el código Python esté bien
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # 3. La prueba de fuego: Intenta construir tu Dockerfile
+      - name: Construir Imagen de Docker
+        run: |
+          docker build -t agrosmart-api:latest .
+          echo "El contenedor Docker se construyó exitosamente"
