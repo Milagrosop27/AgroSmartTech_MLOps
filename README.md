@@ -1,71 +1,200 @@
-#  AgroSmart Tech: MLOps para Predicción de Enfermedades en Cultivos Agrícolas
+# AgroSmartTech_MLOps
 
-AgroSmart Tech es una solución de Machine Learning diseñada para predecir el nivel de riesgo de enfermedades en cultivos agrícolas basándose en datos de sensores IoT (humedad, temperatura, niveles de nitrógeno, ph, etc.). 
+Proyecto universitario para el curso de **Desarrollo de Aplicaciones con DevOps**.  
+Este repositorio implementa una arquitectura **MLOps** para optimizar alertas predictivas agrícolas en **AGROSMART TECH S.A.C.**
 
-Este proyecto implementa un ciclo de vida de **MLOps** completo: desde la generación de datos y entrenamiento del modelo, hasta la creación de una API REST para inferencias en tiempo real.
+## 📌 Descripción
 
----
+El sistema integra modelos de Machine Learning para apoyar decisiones agrícolas mediante predicciones orientadas a:
 
-## Características Principales
+- **Recomendación de cultivo** (modelo agrónomo)
+- **Monitoreo/alertas de riesgo** (modelo guardián)
 
-* **Procesamiento y Balanceo:** Limpieza automática de datos y manejo de clases minoritarias mediante técnicas de oversampling (**SMOTE**).
-* **Modelo Predictivo ("El Guardián"):** Entrenamiento de un modelo `RandomForestClassifier` alcanzando un **98.20% de precisión global** y un 100% de efectividad (recall) en la detección de casos severos.
-* **API REST:** Despliegue local mediante un servidor **Flask** que recibe datos en formato JSON y devuelve diagnósticos en tiempo real.
-
----
-
-## Tecnologías Utilizadas
-
-* **Lenguaje:** Python 3.13
-* **Análisis de Datos:** Pandas, NumPy
-* **Machine Learning:** Scikit-Learn, Imbalanced-Learn
-* **Backend / API:** Flask, Requests
-* **Entorno:** PyCharm, Entornos Virtuales (.venv)
+La solución incluye:
+- Preparación y análisis de datos
+- Entrenamiento de modelos
+- Persistencia de artefactos (`.pkl`)
+- Exposición de predicciones vía API con FastAPI
 
 ---
 
-## Estructura del Proyecto
+## 🧱 Estructura del proyecto
 
 ```text
 AgroSmartTech_MLOps/
-├── data/                       # Archivos CSV (No versionado)
-├── models/                     # Modelos empaquetados en .pkl
+├── README.md
+├── requirements.txt
+├── backend/
+│   └── app.py
+├── data/
+│   ├── Crop_recommendation.csv
+│   ├── Dataset_Smart_Farming_base.csv
+│   └── Smart_Farming_Crop_Yield_2024.csv
+├── models/
+│   ├── agronomo_rf.pkl
 │   ├── guardian_rf.pkl
+│   ├── preprocesador_agronomo.pkl
 │   └── preprocesador_guardian.pkl
-├── scripts/                    # Scripts misceláneos y de generación
+├── notebook/
+│   ├── 01_exploracion.ipynb
+│   ├── 02_procesamiento.ipynb
+│   ├── 03_entrenamiento_guardian.ipynb
+│   └── 04_entrenamiento_agronomo.ipynb
+├── scripts/
 │   └── generar_dataset.py
-├── app.py                      # Servidor backend de Flask (API)
-├── test_api.py                 # Script cliente para simular sensores IoT
-├── 03_entrenamiento.ipynb      # Notebook con el pipeline de entrenamiento
-├── requirements.txt            # Dependencias y librerías del proyecto
-└── README.md                   # Documentación del proyecto
+└── tests/
+    └── test_api.py
+```
 
-Instrucciones de Uso Local
-Sigue estos pasos para levantar "El Guardián" en tu máquina local:
+---
 
-**1. Clonar el repositorio y configurar el entorno**
+## ⚙️ Requisitos
+
+- Python 3.9+ (recomendado)
+- pip
+- Dependencias del archivo `requirements.txt`
+
+---
+
+## 🚀 Instalación
+
+1. Clonar el repositorio:
 ```bash
-git clone [https://github.com/Ethel/AgroSmartTech_MLOps.git](https://github.com/Ethel/AgroSmartTech_MLOps.git)
+git clone <URL_DEL_REPOSITORIO>
 cd AgroSmartTech_MLOps
+```
+
+2. Crear y activar entorno virtual:
+
+**Windows (PowerShell):**
+```powershell
 python -m venv .venv
-source .venv/bin/activate  # En Mac/Linux
+.venv\Scripts\Activate.ps1
+```
 
-2. Instalar las dependencias
+**Linux/Mac:**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
 
-Bash
+3. Instalar dependencias:
+```bash
 pip install -r requirements.txt
+```
 
-3. Iniciar el servidor web (API)
+---
 
-Bash
-python app.py
-El servidor se iniciará en http://127.0.0.1:5000
+## ▶️ Ejecución de la API
 
-4. Realizar una prueba de diagnóstico
-En una nueva terminal, ejecuta el script de simulación para enviar un paquete de datos JSON al servidor:
+Desde la raíz del proyecto:
 
-Bash
-python test_api.py
+```bash
+uvicorn backend.app:app --reload
+```
 
-Deberías recibir una respuesta con el diagnóstico del nivel de riesgo de enfermedad para el cultivo.
+La API estará disponible en:
+
+- `http://127.0.0.1:8000`
+- Documentación Swagger: `http://127.0.0.1:8000/docs`
+- Documentación ReDoc: `http://127.0.0.1:8000/redoc`
+
+---
+
+## 🔌 Endpoints (referencia)
+
+> Ajusta esta sección según los nombres exactos definidos en `backend/app.py`.
+
+Ejemplo de endpoints esperados:
+
+- `GET /` → estado general del servicio
+- `POST /predict/agronomo` → recomendación de cultivo
+- `POST /predict/guardian` → alerta/predicción de riesgo
+
+### Ejemplo de request (genérico)
+
+```json
+{
+  "nitrogeno": 90,
+  "fosforo": 42,
+  "potasio": 43,
+  "temperatura": 20.8,
+  "humedad": 82.0,
+  "ph": 6.5,
+  "lluvia": 202.9
+}
+```
+
+### Ejemplo de respuesta (genérica)
+
+```json
+{
+  "prediccion": "rice",
+  "confianza": 0.93
+}
+```
+
+---
+
+## 🧠 Modelos y artefactos
+
+En `models/` se almacenan:
+
+- `agronomo_rf.pkl`: modelo de recomendación agrícola
+- `guardian_rf.pkl`: modelo de alertas/monitoreo
+- `preprocesador_agronomo.pkl`: pipeline de preprocesamiento del agrónomo
+- `preprocesador_guardian.pkl`: pipeline de preprocesamiento del guardián
+
+---
+
+## 🧪 Pruebas
+
+Ejecutar pruebas con:
+
+```bash
+pytest -q
+```
+
+Archivo principal de pruebas:
+- `tests/test_api.py`
+
+---
+
+## 📊 Flujo de trabajo (MLOps académico)
+
+1. Exploración de datos (`notebook/01_exploracion.ipynb`)
+2. Procesamiento (`notebook/02_procesamiento.ipynb`)
+3. Entrenamiento modelo guardián (`notebook/03_entrenamiento_guardian.ipynb`)
+4. Entrenamiento modelo agrónomo (`notebook/04_entrenamiento_agronomo.ipynb`)
+5. Exportación de modelos a `models/`
+6. Despliegue de inferencia en API (`backend/app.py`)
+
+---
+
+## 🛠️ Tecnologías usadas
+
+- Python
+- FastAPI
+- scikit-learn
+- pandas / numpy
+- pytest
+- Uvicorn
+
+---
+
+## 📌 Mejoras futuras
+
+- Dockerización del servicio
+- Pipeline CI/CD (GitHub Actions)
+- Versionado de modelos y datos (MLflow/DVC)
+- Monitoreo de drift y performance en producción
+- Autenticación y control de acceso a la API
+
+---
+
+## 👥 Autores
+
+Proyecto desarrollado para fines académicos en el curso de Desarrollo de Aplicaciones con DevOps.
+
+---
 
