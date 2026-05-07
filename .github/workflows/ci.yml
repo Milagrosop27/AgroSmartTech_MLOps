@@ -21,7 +21,7 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       # 3. La prueba de fuego: Intenta construir tu Dockerfile
       - name: Construir Imagen de Docker

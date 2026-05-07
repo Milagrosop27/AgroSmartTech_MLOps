@@ -1,5 +1,5 @@
 # 1. Usamos una versión oficial y ligera de Python como base
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # 2. Le decimos a Docker dónde vamos a trabajar dentro de la caja
 WORKDIR /app
