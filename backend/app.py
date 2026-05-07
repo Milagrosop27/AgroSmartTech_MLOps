@@ -37,12 +37,19 @@ def home():
 def predecir():
     try:
         datos_json = request.get_json()
-        df_nuevo = pd.DataFrame([datos_json])
+
+        if isinstance(datos_json, list):
+            df_nuevo = pd.DataFrame(datos_json)
+        else:
+            df_nuevo = pd.DataFrame([datos_json])
+
         datos_procesados = preprocesador.transform(df_nuevo)
         prediccion = modelo_guardian.predict(datos_procesados)
+
         return jsonify({
-            "estado_riesgo": prediccion[0],
-            "status": "success"
+            "estado_riesgo": prediccion.tolist(),  # Devolvemos todo en formato lista JSON
+            "status": "success",
+            "registros_procesados": len(prediccion)
         })
     except Exception as e:
         return jsonify({"error": str(e), "status": "failed"}), 400
@@ -53,12 +60,19 @@ def predecir():
 def recomendar_fertilizante():
     try:
         datos_json = request.get_json()
-        df_nuevo = pd.DataFrame([datos_json])
+
+        if isinstance(datos_json, list):
+            df_nuevo = pd.DataFrame(datos_json)
+        else:
+            df_nuevo = pd.DataFrame([datos_json])
+
         datos_procesados = preprocesador_agronomo.transform(df_nuevo)
         prediccion = modelo_agronomo.predict(datos_procesados)
+
         return jsonify({
-            "fertilizante_recomendado": prediccion[0],
-            "status": "success"
+            "fertilizante_recomendado": prediccion.tolist(),
+            "status": "success",
+            "registros_procesados": len(prediccion)
         })
     except Exception as e:
         return jsonify({"error": str(e), "status": "failed"}), 400
