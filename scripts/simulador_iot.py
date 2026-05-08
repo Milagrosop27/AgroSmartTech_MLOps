@@ -14,9 +14,7 @@ DATA_DIR = BASE_DIR / 'data'
 ruta_iot = DATA_DIR / 'Smart_Farming_Crop_Yield_2024.csv'
 ruta_quimico = DATA_DIR / 'Crop_recommendation.csv'
 
-# ⚠️ Aquí pondrás tu URL de Render mañana. Por ahora apunta a tu compu.
-URL_API = "http://127.0.0.1:5000/predecir"
-
+URL_API = "https://agrosmart-api-940420015515.us-central1.run.app/predecir"
 
 
 # 2. MOTOR DE SIMULACIÓN
