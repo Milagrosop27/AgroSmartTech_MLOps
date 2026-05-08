@@ -4,11 +4,11 @@ FROM python:3.11-slim
 # 2. Le decimos a Docker dónde vamos a trabajar dentro de la caja
 WORKDIR /app
 
-# 3. Copiamos tu lista de compras y la instalamos
+# 3. Copiamos tu lista de requirements y la instalamos
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Copia all the proyecto (modelos, backend, etc.) dentro de la caja
+# 4. Copia all the proyecto dentro de la caja
 COPY . .
 
 # 5. Exponemos el puerto 5000 para que el mundo web pueda conectarse

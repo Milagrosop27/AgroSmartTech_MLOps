@@ -31,7 +31,7 @@ def generar_y_enviar_microbatch():
     etiquetas_quimico = df_quimico['label'].unique()
     mapa_nutricional = {cultivo: np.random.choice(etiquetas_quimico) for cultivo in cultivos_originales}
 
-    # Transformación: Escalar el IoT a 50,000 registros (500 * 100)
+    # Transformación: Escalar el IoT a 50,000 registros
     df_ampliado = pd.concat([df_iot] * 100, ignore_index=True)
 
     # Añadimos ruido estadístico dinámico para que los datos cambien cada minuto
@@ -60,7 +60,7 @@ def generar_y_enviar_microbatch():
     # Convertimos los 50,000 registros a un diccionario JSON
     payload = df_para_api.to_dict(orient='records')
 
-    print(f" Enviando paquete de {len(payload)} registros a la API...")
+    print(f" Enviando paquete de {len(payload)} registros a la API.")
 
     try:
         # Enviamos el POST a la API
