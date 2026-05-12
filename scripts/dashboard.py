@@ -24,7 +24,7 @@ st.markdown("""
 st.title("🚜 AgroSmart Tech: Sistema de Control MLOps")
 st.markdown("### Monitor de Inteligencia Artificial en Tiempo Real (Google Cloud Run)")
 
-# --- RUTAS A LOS DATOS (Igual que en tu simulador) ---
+# --- RUTAS A LOS DATOS
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / 'data'
 ruta_iot = DATA_DIR / 'Smart_Farming_Crop_Yield_2024.csv'
@@ -40,7 +40,7 @@ num_muestras = st.sidebar.select_slider("Cantidad de registros a procesar", opti
 if st.sidebar.button("📡 Sincronizar y Predecir"):
     with st.spinner("Conectando con el cerebro en la nube..."):
         try:
-            # 1. LEER LOS DATOS REALES (Tu motor infalible)
+            # LEER LOS DATOS
             df_iot = pd.read_csv(ruta_iot)
             df_quimico = pd.read_csv(ruta_quimico)
 
@@ -69,7 +69,7 @@ if st.sidebar.button("📡 Sincronizar y Predecir"):
 
             payload = df_para_api.to_dict(orient='records')
 
-            # 2. Llamada real a Google Cloud
+            # Llamada a Google Cloud
             res = requests.post(URL_API, json=payload)
 
             if res.status_code == 200:
@@ -96,7 +96,7 @@ if st.sidebar.button("📡 Sincronizar y Predecir"):
 
                 st.divider()
 
-                # --- FILA 2: GRÁFICOS DINÁMICOS ---
+                # GRÁFICOS DINÁMICOS
                 col_left, col_right = st.columns(2)
 
                 with col_left:
