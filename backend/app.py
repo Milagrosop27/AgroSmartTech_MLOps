@@ -1,15 +1,17 @@
-from flask import Flask, request, jsonify
 import joblib
 import polars as pl
 import xgboost as xgb
 from pathlib import Path
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # Inicializamos el servidor de Flask
 app = Flask(__name__)
+CORS(app)
 
 # Configuramos las rutas universales para encontrar los modelos
 BASE_DIR = Path(__file__).resolve().parent.parent
-MODELS_DIR = BASE_DIR / 'models'
+MODELS_DIR = Path(__file__).parent.parent / 'models'
 models = {}
 
 def cargar_recursos():
@@ -103,3 +105,4 @@ def recomendar_fertilizante():
 # Arrancamos el servidor en el puerto 5000
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+
