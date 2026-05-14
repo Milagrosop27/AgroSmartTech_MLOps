@@ -10,19 +10,38 @@ function App() {
 
   useEffect(() => {
     const consultarSistemas = async () => {
-      try {
-        const dataEntrada = { "Temperatura": 25, "Humedad": 60, "pH": 6.5, "NDVI": 0.8 };
-        const [resGuardian, resAgronomic] = await Promise.all([
-          getPrediction(dataEntrada),
-          getRecommendation(dataEntrada)
-        ]);
-        setRiesgo(resGuardian.data.estado_riesgo[0]);
-        setFertilizante(resAgronomic.data.recomendacion[0]);
-      } catch (error) {
-        setRiesgo("Error de conexión");
-        setFertilizante("Error de conexión");
-      }
+    try {
+      // 1. Enviamos las llaves exactas que espera Polars/XGBoost
+      // Prueba con estos nombres exactos en App.jsx
+      const dataEntrada = {
+      "temperatura": 25,    // ← minúsculas
+      "humedad": 60,        // ← minúsculas
+      "ph": 6.5,            // ← minúsculas
+      "ndvi": 0.8           // ← minúsculas
     };
+
+      const [resGuardian, resAgronomic] = await Promise.all([
+        getPrediction(dataEntrada),
+        getRecommendation(dataEntrada)
+      ]);
+
+      // 2. OJO: Tu backend devuelve "estado_riesgo" y "fertilizante_recomendado"
+      // Verificamos que existan antes de setear
+      if (resGuardian.data.estado_riesgo) {
+        setRiesgo(resGuardian.data.estado_riesgo[0]);
+      }
+
+      if (resAgronomic.data.fertilizante_recomendado) {
+        setFertilizante(resAgronomic.data.fertilizante_recomendado[0]);
+      }
+
+    } catch (error) {
+      console.error("Error en la petición:", error.response?.data || error.message);
+      setRiesgo("Revisar Columnas");
+      setFertilizante("Revisar Columnas");
+    }
+  };
+
     consultarSistemas();
   }, []);
 
@@ -74,8 +93,8 @@ function App() {
           {/* Sección de Validación */}
           <div className="mb-6">
             <AlertDispatcher
-              prediction="Se recomienda aplicar fertilizante potásico en el Lote 4 debido a baja humedad residual."
-              onApprove={() => alert("¡Alerta enviada!")}
+              prediction={`ESTADO: ${riesgo} - Aplicar ${fertilizante} para estabilizar el cultivo.`}
+              onApprove={() => alert(`Enviando alerta: ${riesgo} - Aplicar ${fertilizante}`)}
             />
           </div>
 

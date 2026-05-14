@@ -10,17 +10,15 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuramos las rutas universales para encontrar los modelos
-BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = Path(__file__).parent.parent / 'models'
 models = {}
+
 
 def cargar_recursos():
     try:
         # --- CARGA MODELO 1: EL GUARDIÁN ---
-        # Cargamos el modelo desde JSON (Formato nativo de XGBoost)
         mod_guardian = xgb.XGBClassifier()
         mod_guardian.load_model(MODELS_DIR / 'guardian_xgb.json')
-
         models['guardian'] = mod_guardian
         models['pre_guardian'] = joblib.load(MODELS_DIR / 'preprocesador_guardian.pkl')
         models['le_guardian'] = joblib.load(MODELS_DIR / 'label_encoder_guardian.pkl')
@@ -28,7 +26,6 @@ def cargar_recursos():
         # --- CARGA MODELO 2: EL AGRÓNOMO ---
         mod_agronomo = xgb.XGBClassifier()
         mod_agronomo.load_model(MODELS_DIR / 'agronomo_xgb.json')
-
         models['agronomo'] = mod_agronomo
         models['pre_agronomo'] = joblib.load(MODELS_DIR / 'preprocesador_agronomo.pkl')
         models['le_agronomo'] = joblib.load(MODELS_DIR / 'label_encoder_agronomo.pkl')
@@ -37,72 +34,111 @@ def cargar_recursos():
     except Exception as e:
         print(f" Error al cargar recursos: {e}")
 
+
 # Ejecutamos la carga al iniciar
 cargar_recursos()
 
 
-# Ruta 1: Un endpoint de prueba para saber si el servidor está activo
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({
         "proyecto": "AgroSmart Tech",
         "estado": "Activo",
-        "motor": "XGBoost + Polars",
-        "servicios": ["Monitoreo de Riesgo (Guardian)", "Recomendacion de Fertilizante (Agronomo)"]
+        "servicios": ["Guardian", "Agronomo"]
     })
 
-# Ruta 2: Ventanilla del Guardián (Riesgos)
+
 @app.route('/predecir', methods=['POST'])
 def predecir():
     try:
-        datos_json = request.get_json()
+        entrada = request.get_json()
 
-        # Si es un solo diccionario, lo metemos en una lista para que Polars lo lea bien
-        if not isinstance(datos_json, list):
-            datos_json = [datos_json]
+        # Creamos el diccionario completo con valores por defecto + datos del sensor
+        datos_completos = {
+            "region": "North", "crop_type": "Wheat", "irrigation_type": "Drip",
+            "fertilizer_type": "Urea", "pesticide_usage_ml": 200, "total_days": 120,
+            "yield_kg_per_hectare": 5000, "sunlight_hours": 8, "rainfall_mm": 150,
+            "N": 40, "P": 30, "K": 20,
+            # Aquí entran los datos reales del Dashboard:
+            "temperature_C": entrada.get('temperatura', 25),
+            "humidity_%": entrada.get('humedad', 60),
+            "soil_pH": entrada.get('ph', 6.5),
+            "soil_moisture_%": entrada.get('humedad', 60),  # Usamos humedad como proxy
+            "NDVI_index": entrada.get('ndvi', 0.8)
+        }
 
-        # Ahora creamos el DataFrame de forma veloz
-        df_nuevo = pl.DataFrame(datos_json).to_pandas()
+        df = pl.DataFrame([datos_completos]).to_pandas()
 
-        # Llamamos al preprocesador desde el diccionario models
-        datos_procesados = models['pre_guardian'].transform(df_nuevo)
-        prediccion = models['guardian'].predict(datos_procesados)
+        # IMPORTANTE: Reordenar las columnas exactamente como se entrenaron
+        orden_entrenamiento = [
+            'region', 'crop_type', 'soil_moisture_%', 'soil_pH', 'temperature_C',
+            'rainfall_mm', 'humidity_%', 'sunlight_hours', 'irrigation_type',
+            'fertilizer_type', 'pesticide_usage_ml', 'total_days',
+            'yield_kg_per_hectare', 'NDVI_index', 'N', 'P', 'K'
+        ]
+        df = df[orden_entrenamiento]
+
+        proc = models['pre_guardian'].transform(df)
+        pred = models['guardian'].predict(proc)
+        label = models['le_guardian'].inverse_transform(pred)
+
+        mapeo_riesgo = {
+            "Severe": "Riesgo Crítico",
+            "Moderate": "Riesgo Moderado",
+            "Low": "Estado Óptimo"
+        }
+        resultado_es = mapeo_riesgo.get(label[0], label[0])
 
         return jsonify({
-            "estado_riesgo": prediccion.tolist(),  # Devolvemos todo en formato lista JSON
-            "status": "success",
-            "registros_procesados": len(prediccion)
+            "estado_riesgo": [resultado_es],
+            "status": "success"
         })
     except Exception as e:
-        return jsonify({"error": str(e), "status": "failed"}), 400
+        return jsonify({"error": str(e)}), 400
 
 
-# Ruta 3: Ventanilla del Agrónomo (Recomendación de Fertilizante)
 @app.route('/recomendar_fertilizante', methods=['POST'])
 def recomendar_fertilizante():
     try:
-        datos_json = request.get_json()
-        df_nuevo = pl.DataFrame(datos_json).to_pandas()
+        entrada = request.get_json()
 
-        # 1. Preprocesamiento
-        datos_proc = models['pre_agronomo'].transform(df_nuevo)
+        # 1. Completamos el perfil de 17 columnas para el Agrónomo
+        datos_completos = {
+            "region": "North", "crop_type": "Wheat", "irrigation_type": "Drip",
+            "fertilizer_type": "Urea", "pesticide_usage_ml": 200, "total_days": 120,
+            "yield_kg_per_hectare": 5000, "sunlight_hours": 8, "rainfall_mm": 150,
+            "N": 40, "P": 30, "K": 20,
+            "temperature_C": entrada.get('temperatura', 25),
+            "humidity_%": entrada.get('humedad', 60),
+            "soil_pH": entrada.get('ph', 6.5),
+            "soil_moisture_%": entrada.get('humedad', 60),
+            "NDVI_index": entrada.get('ndvi', 0.8)
+        }
 
-        # 2. Predicción
-        preds_numericas = models['agronomo'].predict(datos_proc)
+        # 2. El orden debe ser IDÉNTICO al del entrenamiento
+        orden_entrenamiento = [
+            'region', 'crop_type', 'soil_moisture_%', 'soil_pH', 'temperature_C',
+            'rainfall_mm', 'humidity_%', 'sunlight_hours', 'irrigation_type',
+            'fertilizer_type', 'pesticide_usage_ml', 'total_days',
+            'yield_kg_per_hectare', 'NDVI_index', 'N', 'P', 'K'
+        ]
 
-        # 3. Traducción (Urea, DAP, etc.)
-        preds_texto = models['le_agronomo'].inverse_transform(preds_numericas)
+        df = pl.DataFrame([datos_completos]).to_pandas()
+        df = df[orden_entrenamiento]
+
+        # 3. Inferencia
+        proc = models['pre_agronomo'].transform(df)
+        pred = models['agronomo'].predict(proc)
+        label = models['le_agronomo'].inverse_transform(pred)
 
         return jsonify({
-            "fertilizante_recomendado": preds_texto.tolist(),
-            "status": "success",
-            "total": len(preds_texto)
+            "fertilizante_recomendado": label.tolist(),
+            "status": "success"
         })
     except Exception as e:
-        return jsonify({"error": str(e), "status": "failed"}), 400
+        print(f"Error en Agrónomo: {e}")
+        return jsonify({"error": str(e)}), 400
 
-
-# Arrancamos el servidor en el puerto 5000
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
 

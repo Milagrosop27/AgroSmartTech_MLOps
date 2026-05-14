@@ -6,6 +6,7 @@ WORKDIR /app
 
 # 3. Copiamos tu lista de requirements y la instalamos
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 4. Copia all the proyecto dentro de la caja
