@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuramos las rutas universales para encontrar los modelos
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = Path(__file__).parent.parent / 'models'
 models = {}
 
