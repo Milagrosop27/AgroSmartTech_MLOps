@@ -27,7 +27,7 @@ sistemas_ia = {}
 # Inicializamos el cliente de BigQuery
 bq_client = bigquery.Client()
 # FORMATO: proyecto.dataset.tabla
-TABLE_ID = "tu-proyecto-id.agrosmart_data.predicciones_iot"
+TABLE_ID = "agrosmart-tech-mlops.agrosmart_data.predicciones_iot"
 
 
 def guardar_en_bigquery(datos_sensor, diagnostico):
