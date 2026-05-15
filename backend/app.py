@@ -14,6 +14,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = BASE_DIR / 'models'
 
+logging.info(f"Ruta raíz detectada: {BASE_DIR}")
+logging.info(f"Buscando modelos en: {MODELS_DIR}")
+
 # Diccionario global para mantener los modelos en memoria
 sistemas_ia = {}
 
