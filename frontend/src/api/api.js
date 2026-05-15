@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://192.168.18.28:5000',
+  baseURL: 'https://agrosmart-api-940420015515.us-central1.run.app',
 });
 
 export const getPrediction = (data) => api.post('/predecir', data);

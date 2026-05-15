@@ -4,6 +4,9 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
+from google.cloud import bigquery
+import datetime
+import os
 
 # Inicializamos Flask
 app = Flask(__name__)
@@ -19,6 +22,37 @@ logging.info(f"Buscando modelos en: {MODELS_DIR}")
 
 # Diccionario global para mantener los modelos en memoria
 sistemas_ia = {}
+
+
+# Inicializamos el cliente de BigQuery
+bq_client = bigquery.Client()
+# FORMATO: proyecto.dataset.tabla
+TABLE_ID = "tu-proyecto-id.agrosmart_data.predicciones_iot"
+
+
+def guardar_en_bigquery(datos_sensor, diagnostico):
+    try:
+        # Creamos el registro exactamente como definimos el esquema
+        fila = {
+            "fecha_hora": datetime.datetime.utcnow().isoformat(),
+            "temperatura": float(datos_sensor.get('temperature_C', 0)),
+            "humedad": float(datos_sensor.get('humidity_%', 0)),
+            "ph": float(datos_sensor.get('soil_ph', 0)),
+            "ndvi": float(datos_sensor.get('NDVI', 0)),
+            "riesgo_enfermedad": str(diagnostico)
+        }
+
+        # Insertamos la fila
+        errors = bq_client.insert_rows_json(TABLE_ID, [fila])
+
+        if errors:
+            logging.error(f"Errores al insertar en BigQuery: {errors}")
+        else:
+            logging.info("Datos guardados en BigQuery correctamente.")
+
+    except Exception as e:
+        logging.error(f"Error en la conexión con BigQuery: {e}")
+
 
 
 def cargar_recursos():
@@ -59,16 +93,16 @@ def home():
 def predecir():
     try:
         datos_json = request.get_json()
-
-        # Convertir a DataFrame masivo
         df_nuevo = pd.DataFrame(datos_json) if isinstance(datos_json, list) else pd.DataFrame([datos_json])
 
-        # Transformación y Predicción Vectorizada
+        # Predicción
         datos_procesados = sistemas_ia['pre_guardian'].transform(df_nuevo)
         prediccion_numerica = sistemas_ia['modelo_guardian'].predict(datos_procesados)
-
-        # Decodificar números a las etiquetas originales (ej. "Mild", "Severe")
         prediccion_texto = sistemas_ia['le_guardian'].inverse_transform(prediccion_numerica)
+
+        # MANDAR A BIGQUERY (Tomamos el primero del lote para el histórico)
+        primer_registro = datos_json[0] if isinstance(datos_json, list) else datos_json
+        guardar_en_bigquery(primer_registro, prediccion_texto[0])
 
         return jsonify({
             "estado_riesgo": prediccion_texto.tolist(),
@@ -76,7 +110,6 @@ def predecir():
             "registros_procesados": len(prediccion_texto)
         })
     except Exception as e:
-        logging.error(f"Error en /predecir: {e}")
         return jsonify({"error": str(e), "status": "failed"}), 400
 
 

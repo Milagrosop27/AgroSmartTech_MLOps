@@ -24,7 +24,7 @@ function App() {
   useEffect(() => {
     const consultarSistemas = async () => {
       try {
-        const response = await fetch('http://localhost:5000/datos-dashboard');
+        const response = await fetch('https://agrosmart-api-940420015515.us-central1.run.app/datos-dashboard');
         const datos = await response.json();
 
         if (datos && datos.length > 0) {

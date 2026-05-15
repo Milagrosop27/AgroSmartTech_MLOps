@@ -7,3 +7,4 @@ imbalanced-learn==0.14.1
 joblib==1.5.3
 gunicorn==26.0.0
 requests==2.33.1
+google-cloud-bigquery
