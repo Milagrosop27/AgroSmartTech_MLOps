@@ -31,9 +31,9 @@ def cargar_recursos():
         sistemas_ia['pre_agronomo'] = joblib.load(MODELS_DIR / 'preprocesador_agronomo.pkl')
         sistemas_ia['le_agronomo'] = joblib.load(MODELS_DIR / 'label_encoder_agronomo.pkl')
 
-        logging.info("✅ Modelos Random Forest y preprocesadores cargados correctamente.")
+        logging.info("Modelos Random Forest y preprocesadores cargados correctamente.")
     except Exception as e:
-        logging.error(f"❌ Error crítico al cargar los modelos: {e}")
+        logging.error(f"Error crítico al cargar los modelos: {e}")
 
 
 # Ejecutar carga al iniciar el servidor

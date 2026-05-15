@@ -16,4 +16,4 @@ COPY . .
 EXPOSE 5000
 
 # 6. La orden final: Prender el servidor Flask cuando la caja se abra
-CMD ["python", "backend/app.py"]
+CMD exec gunicorn --bind :$PORT --workers 4 --threads 8 --timeout 0 backend.app:app
