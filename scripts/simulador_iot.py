@@ -14,7 +14,7 @@ DATA_DIR = BASE_DIR / 'data'
 ruta_iot = DATA_DIR / 'Smart_Farming_Crop_Yield_2024.csv'
 ruta_quimico = DATA_DIR / 'Crop_recommendation.csv'
 
-URL_API = "https://agrosmart-api-940420015515.us-central1.run.app/predecir"
+URL_API = "http://localhost:5000/predecir"
 
 
 # 2. MOTOR DE SIMULACIÓN
@@ -30,7 +30,7 @@ def generar_y_enviar_microbatch():
     mapa_nutricional = {cultivo: np.random.choice(etiquetas_quimico) for cultivo in cultivos_originales}
 
     # Transformación: Escalar el IoT a 50,000 registros
-    df_ampliado = pd.concat([df_iot] * 100, ignore_index=True)
+    df_ampliado = df_iot.sample(500)
 
     # Añadimos ruido estadístico dinámico para que los datos cambien cada minuto
     ruido_temp = np.random.normal(0, 0.5, size=len(df_ampliado))
@@ -53,12 +53,11 @@ def generar_y_enviar_microbatch():
                              'longitude', 'crop_disease_status']
     df_para_api = df_maestro.drop(columns=columnas_irrelevantes, errors='ignore')
 
-    df_para_api = df_para_api.replace({np.nan: None})
-
-    # Convertimos los 50,000 registros a un diccionario JSON
+    # Asegurar que no haya valores infinitos o NaN que rompan el JSON
+    df_para_api = df_para_api.replace([np.inf, -np.inf], np.nan).fillna(0)
     payload = df_para_api.to_dict(orient='records')
 
-    print(f" Enviando paquete de {len(payload)} registros a la API.")
+    print(f"Enviando {len(payload)} registros a: {URL_API}")
 
     try:
         # Enviamos el POST a la API
