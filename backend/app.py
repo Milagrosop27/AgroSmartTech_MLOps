@@ -30,28 +30,37 @@ bq_client = bigquery.Client()
 TABLE_ID = "agrosmart-tech-mlops.agrosmart_data.predicciones_iot"
 
 
-def guardar_en_bigquery(datos_sensor, diagnostico):
+def guardar_en_bigquery(datos_json_lista, predicciones_texto):
     try:
-        # Creamos el registro exactamente como definimos el esquema
-        fila = {
-            "fecha_hora": datetime.datetime.utcnow().isoformat(),
-            "temperatura": float(datos_sensor.get('temperature_C', 0)),
-            "humedad": float(datos_sensor.get('humidity_%', 0)),
-            "ph": float(datos_sensor.get('soil_ph', 0)),
-            "ndvi": float(datos_sensor.get('NDVI', 0)),
-            "riesgo_enfermedad": str(diagnostico)
-        }
+        filas = []
+        # Aseguramos que si llega un solo diccionario, se convierta en lista
+        if not isinstance(datos_json_lista, list):
+            datos_json_lista = [datos_json_lista]
 
-        # Insertamos la fila
-        errors = bq_client.insert_rows_json(TABLE_ID, [fila])
+        timestamp_ahora = datetime.datetime.utcnow().isoformat()
+
+        # Iteramos sobre los registros
+        for i, dato in enumerate(datos_json_lista):
+            fila = {
+                "fecha_hora": timestamp_ahora,
+                "temperatura": round(float(dato.get('temperature_C', 0)), 2),
+                "humedad": round(float(dato.get('humidity_%', 0)), 2),
+                "ph": round(float(dato.get('soil_pH', 0)), 2),
+                "ndvi": round(float(dato.get('NDVI_index', 0)), 2),
+                "riesgo_enfermedad": str(predicciones_texto[i])
+            }
+            filas.append(fila)
+
+        # Insertamos los 100 de un solo golpe
+        errors = bq_client.insert_rows_json(TABLE_ID, filas)
 
         if errors:
             logging.error(f"Errores al insertar en BigQuery: {errors}")
         else:
-            logging.info("Datos guardados en BigQuery correctamente.")
+            logging.info(f"¡Éxito! {len(filas)} datos guardados en BigQuery masivamente.")
 
     except Exception as e:
-        logging.error(f"Error en la conexión con BigQuery: {e}")
+        logging.error(f"Error en la conexión masiva con BigQuery: {e}")
 
 
 
@@ -100,9 +109,8 @@ def predecir():
         prediccion_numerica = sistemas_ia['modelo_guardian'].predict(datos_procesados)
         prediccion_texto = sistemas_ia['le_guardian'].inverse_transform(prediccion_numerica)
 
-        # MANDAR A BIGQUERY (Tomamos el primero del lote para el histórico)
-        primer_registro = datos_json[0] if isinstance(datos_json, list) else datos_json
-        guardar_en_bigquery(primer_registro, prediccion_texto[0])
+        # MANDAR A BIGQUERY: Guardar el lote completo
+        guardar_en_bigquery(datos_json, prediccion_texto)
 
         return jsonify({
             "estado_riesgo": prediccion_texto.tolist(),
