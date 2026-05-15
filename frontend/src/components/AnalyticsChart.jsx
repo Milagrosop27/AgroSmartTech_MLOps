@@ -1,19 +1,10 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-const data = [
-  { name: 'Lun', humedad: 40, rendimiento: 2400 },
-  { name: 'Mar', humedad: 30, rendimiento: 1398 },
-  { name: 'Mie', humedad: 20, rendimiento: 9800 },
-  { name: 'Jue', humedad: 27, rendimiento: 3908 },
-  { name: 'Vie', humedad: 18, rendimiento: 4800 },
-  { name: 'Sab', humedad: 23, rendimiento: 3800 },
-  { name: 'Dom', humedad: 34, rendimiento: 4300 },
-];
 
-const AnalyticsChart = () => {
+const AnalyticsChart = ({ data }) => {
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80">
-      <h3 className="text-lg font-bold text-gray-800 mb-4">Tendencia de Humedad vs Rendimiento</h3>
+      <h3 className="text-lg font-bold text-gray-800 mb-4">Tendencia de Humedad en Tiempo Real</h3>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data}>
           <defs>
@@ -23,14 +14,21 @@ const AnalyticsChart = () => {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} padding={{ left: 30, right: 30 }} />
-          <YAxis hide={true} />
+
+          {/* Usamos la clave "fecha" que viene de BigQuery */}
+          <XAxis dataKey="fecha" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} padding={{ left: 30, right: 30 }} />
+
+          {/* Ponemos un dominio automático para que la gráfica suba y baje dinámicamente */}
+          <YAxis domain={['auto', 'auto']} hide={true} />
+
           <Tooltip
             contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
           />
+
+          {/* Usamos la clave "hum" que viene de BigQuery */}
           <Area
             type="monotone"
-            dataKey="humedad"
+            dataKey="hum"
             stroke="#166534"
             fillOpacity={1}
             fill="url(#colorHumedad)"

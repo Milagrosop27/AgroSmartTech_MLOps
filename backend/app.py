@@ -10,7 +10,7 @@ import os
 
 # Inicializamos Flask
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- CONFIGURACIÓN DE RUTAS ---
@@ -145,6 +145,45 @@ def recomendar_fertilizante():
     except Exception as e:
         logging.error(f"Error en /recomendar_fertilizante: {e}")
         return jsonify({"error": str(e), "status": "failed"}), 400
+
+
+# ruta 4: DASHBOARD 
+@app.route('/datos-dashboard', methods=['GET'])
+def datos_dashboard():
+    try:
+        # Definimos el ID del proyecto directamente para evitar fallos
+        PROJECT_ID = "agrosmart-tech-mlops"
+        QUERY_TABLE = f"{PROJECT_ID}.agrosmart_data.predicciones_iot"
+
+        # Consultamos los últimos 20 registros para que el gráfico no esté vacío
+        query = f"""
+            SELECT fecha_hora, temperatura, humedad, ph, ndvi, riesgo_enfermedad 
+            FROM `{QUERY_TABLE}` 
+            ORDER BY fecha_hora DESC 
+            LIMIT 20
+        """
+
+        query_job = bq_client.query(query)
+        results = query_job.result()
+
+        historico = []
+        for row in results:
+            historico.append({
+                "fecha": row.fecha_hora.strftime('%H:%M:%S'),
+                "temp": row.temperatura,
+                "hum": row.humedad,
+                "ph": row.ph,
+                "ndvi": row.ndvi,
+                "diagnostico": row.riesgo_enfermedad
+            })
+
+        # IMPORTANTE: Invertimos la lista para que el gráfico se dibuje
+        # de izquierda (pasado) a derecha (presente)
+        return jsonify(historico[::-1])
+
+    except Exception as e:
+        logging.error(f"Error al consultar BigQuery para el dashboard: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # Arrancamos el servidor en el puerto 5000

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LayoutDashboard, ShieldCheck, Sprout, BellRing, Database } from 'lucide-react';
 import AlertDispatcher from './components/AlertDispatcher';
 import AnalyticsChart from './components/AnalyticsChart';
@@ -7,30 +7,36 @@ function App() {
   const [seccionActiva, setSeccionActiva] = useState('dashboard');
   const [riesgo, setRiesgo] = useState("Esperando Simulador...");
   const [fertilizante, setFertilizante] = useState("Esperando...");
-
-  // Estados para datos dinámicos en el Guardián
-  const [datosSensores, setDatosSensores] = useState({ temp: 0, hum: 0, ph: 0, ndvi: 0 });
-
-  const [historialAlertas, setHistorialAlertas] = useState(() => {
+    const [historialAlertas, setHistorialAlertas] = useState(() => {
     const guardado = localStorage.getItem('agro_history_v1');
     return guardado ? JSON.parse(guardado) : [];
   });
+  const [datosSensores, setDatosSensores] = useState({ temp: 0, hum: 0, ph: 0, ndvi: 0 });
+  const [historialGrafico, setHistorialGrafico] = useState([]); // <-- NUEVO ESTADO PARA EL GRÁFICO
 
   useEffect(() => {
     localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
   }, [historialAlertas]);
 
   // --- SINCRONIZACIÓN CON EL SIMULADOR ---
-  useEffect(() => {
+useEffect(() => {
     const consultarSistemas = async () => {
       try {
+        // Asegúrate de que esta URL sea la correcta de tu Cloud Run
         const response = await fetch('https://agrosmart-api-940420015515.us-central1.run.app/datos-dashboard');
         const datos = await response.json();
 
         if (datos && datos.length > 0) {
+          // 1. Llenamos el gráfico con los últimos 20 registros
+          setHistorialGrafico(datos);
+
+          // 2. Extraemos el último registro para las tarjetas grandes
           const ultimo = datos[datos.length - 1];
           setRiesgo(ultimo.diagnostico);
-          setFertilizante(ultimo.recomendacion);
+
+          // Nota: Si tu API aún no manda 'recomendacion', esto se quedará estático por ahora
+          if(ultimo.recomendacion) setFertilizante(ultimo.recomendacion);
+
           setDatosSensores({
             temp: ultimo.temp,
             hum: ultimo.hum,
@@ -44,7 +50,8 @@ function App() {
     };
 
     consultarSistemas();
-    const intervalo = setInterval(consultarSistemas, 3000);
+    // Consultamos BigQuery cada 5 segundos para no saturar
+    const intervalo = setInterval(consultarSistemas, 5000);
     return () => clearInterval(intervalo);
   }, []);
 
@@ -95,7 +102,7 @@ function App() {
 
             <div className="grid grid-cols-12 gap-6 mt-6">
               <div className="col-span-12 lg:col-span-8 bg-white p-4 rounded-xl border shadow-sm">
-                <AnalyticsChart />
+                <AnalyticsChart data={historialGrafico} />
               </div>
               <div className="col-span-12 lg:col-span-4 bg-white p-6 rounded-xl border shadow-sm h-[320px]">
                   <h4 className="text-gray-500 text-sm font-medium mb-4 uppercase">Lectura Actual</h4>
