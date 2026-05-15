@@ -131,10 +131,19 @@ def recomendar_fertilizante():
         pred = models['agronomo'].predict(proc)
         label = models['le_agronomo'].inverse_transform(pred)
 
+        mapeo_fert = {
+            "Inorganic": "Fertilizante Inorgánico",
+            "Organic": "Abono Orgánico",
+            "Urea": "Urea (Nitrógeno)",
+            "DAP": "DAP (Fosfato)"
+        }
+        recomendacion_es = mapeo_fert.get(label[0], label[0])
+
         return jsonify({
-            "fertilizante_recomendado": label.tolist(),
+            "fertilizante_recomendado": [recomendacion_es],
             "status": "success"
         })
+
     except Exception as e:
         print(f"Error en Agrónomo: {e}")
         return jsonify({"error": str(e)}), 400
