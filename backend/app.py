@@ -92,7 +92,11 @@ def predecir():
         # 3. Guardar ambos en BigQuery
         guardar_en_bigquery(datos_json, riesgos, recoms)
 
-        return jsonify({"status": "success", "riesgo": riesgos.tolist()})
+        return jsonify({
+            "estado_riesgo": riesgos.tolist(),  # Cambiamos 'riesgo' por 'estado_riesgo'
+            "status": "success",
+            "registros_procesados": len(riesgos)  # Esto es lo que lee el simulador
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
