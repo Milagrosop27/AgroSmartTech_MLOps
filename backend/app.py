@@ -1,105 +1,109 @@
 import joblib
 import pandas as pd
-import xgboost as xgb
 from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from collections import deque
+import logging
 
 # Inicializamos Flask
 app = Flask(__name__)
 CORS(app)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- CONFIGURACIÓN DE MODELOS ---
-MODELS_DIR = Path(__file__).parent.parent / 'models'
-models = {}
-# Memoria persistente para el Dashboard (últimos 500 registros)
-historico_datos = deque(maxlen=500)
+# --- CONFIGURACIÓN DE RUTAS ---
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODELS_DIR = BASE_DIR / 'models'
 
-ORDEN_ENTRENAMIENTO = [
-    'region', 'crop_type', 'soil_moisture_%', 'soil_pH', 'temperature_C',
-    'rainfall_mm', 'humidity_%', 'sunlight_hours', 'irrigation_type',
-    'fertilizer_type', 'pesticide_usage_ml', 'total_days',
-    'yield_kg_per_hectare', 'NDVI_index', 'N', 'P', 'K'
-]
+# Diccionario global para mantener los modelos en memoria
+sistemas_ia = {}
 
 
 def cargar_recursos():
+    """Carga los modelos Random Forest, preprocesadores y codificadores desde los .pkl"""
     try:
-        # Carga Guardián
-        models['guardian'] = xgb.XGBClassifier()
-        models['guardian'].load_model(MODELS_DIR / 'guardian_xgb.json')
-        models['pre_guardian'] = joblib.load(MODELS_DIR / 'preprocesador_guardian.pkl')
-        models['le_guardian'] = joblib.load(MODELS_DIR / 'label_encoder_guardian.pkl')
-        # Carga Agrónomo
-        models['agronomo'] = xgb.XGBClassifier()
-        models['agronomo'].load_model(MODELS_DIR / 'agronomo_xgb.json')
-        models['pre_agronomo'] = joblib.load(MODELS_DIR / 'preprocesador_agronomo.pkl')
-        models['le_agronomo'] = joblib.load(MODELS_DIR / 'label_encoder_agronomo.pkl')
-        print("✅ Sistemas de IA cargados y listos.")
+        # Carga Guardián (Riesgo de Enfermedad)
+        sistemas_ia['modelo_guardian'] = joblib.load(MODELS_DIR / 'guardian_rf.pkl')
+        sistemas_ia['pre_guardian'] = joblib.load(MODELS_DIR / 'preprocesador_guardian.pkl')
+        sistemas_ia['le_guardian'] = joblib.load(MODELS_DIR / 'label_encoder_guardian.pkl')
+
+        # Carga Agrónomo (Recomendación de Fertilizante)
+        sistemas_ia['modelo_agronomo'] = joblib.load(MODELS_DIR / 'agronomo_rf.pkl')
+        sistemas_ia['pre_agronomo'] = joblib.load(MODELS_DIR / 'preprocesador_agronomo.pkl')
+        sistemas_ia['le_agronomo'] = joblib.load(MODELS_DIR / 'label_encoder_agronomo.pkl')
+
+        logging.info("✅ Modelos Random Forest y preprocesadores cargados correctamente.")
     except Exception as e:
-        print(f"❌ Error crítico al cargar modelos: {e}")
+        logging.error(f"❌ Error crítico al cargar los modelos: {e}")
 
 
+# Ejecutar carga al iniciar el servidor
 cargar_recursos()
 
 
+# Ruta 1: Un endpoint de prueba para saber si el servidor está activo
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({
+        "proyecto": "AgroSmart Tech",
+        "estado": "Activo",
+        "arquitectura": "Stateless API con Flask",
+        "mensaje": "El Guardian y el Agronomo están listos para recibir datos."
+    })
+
+
+# Ruta 2: Ventanilla del Guardián (Riesgos)
 @app.route('/predecir', methods=['POST'])
 def predecir():
-    global historico_datos
     try:
-        entrada = request.get_json()
+        datos_json = request.get_json()
 
-        # Convertir a DataFrame (soporta un dict o una lista de dicts)
-        df = pd.DataFrame(entrada) if isinstance(entrada, list) else pd.DataFrame([entrada])
+        # Convertir a DataFrame masivo
+        df_nuevo = pd.DataFrame(datos_json) if isinstance(datos_json, list) else pd.DataFrame([datos_json])
 
-        # Normalización básica de columnas del simulador
-        if 'humidity_%' in df.columns and 'soil_moisture_%' not in df.columns:
-            df['soil_moisture_%'] = df['humidity_%']
+        # Transformación y Predicción Vectorizada
+        datos_procesados = sistemas_ia['pre_guardian'].transform(df_nuevo)
+        prediccion_numerica = sistemas_ia['modelo_guardian'].predict(datos_procesados)
 
-        # Asegurar todas las columnas necesarias
-        for col in ORDEN_ENTRENAMIENTO:
-            if col not in df.columns: df[col] = 0
-        df = df[ORDEN_ENTRENAMIENTO]
+        # Decodificar números a las etiquetas originales (ej. "Mild", "Severe")
+        prediccion_texto = sistemas_ia['le_guardian'].inverse_transform(prediccion_numerica)
 
-        # Inferencia Vectorizada (Ambos modelos de una sola vez)
-        proc_g = models['pre_guardian'].transform(df)
-        preds_g = models['guardian'].predict(proc_g)
-        labels_g = models['le_guardian'].inverse_transform(preds_g)
-
-        proc_a = models['pre_agronomo'].transform(df)
-        preds_a = models['agronomo'].predict(proc_a)
-        labels_a = models['le_agronomo'].inverse_transform(preds_a)
-
-        mapeos = {
-            "riesgo": {"Severe": "Riesgo Crítico", "Moderate": "Riesgo Moderado", "Low": "Estado Óptimo"},
-            "fert": {"Inorganic": "Inorgánico", "Organic": "Orgánico", "Urea": "Urea", "DAP": "DAP"}
-        }
-
-        # Guardar resultados en el histórico para el Dashboard
-        for i in range(len(labels_g)):
-            res_g = mapeos["riesgo"].get(labels_g[i], labels_g[i])
-            res_a = mapeos["fert"].get(labels_a[i], labels_a[i])
-
-            historico_datos.append({
-                "fecha": pd.Timestamp.now().strftime("%H:%M:%S"),
-                "diagnostico": res_g,
-                "recomendacion": res_a,
-                "temp": float(df.iloc[i]['temperature_C']),
-                "hum": float(df.iloc[i]['humidity_%']),
-                "ph": float(df.iloc[i]['soil_pH']),
-                "ndvi": float(df.iloc[i]['NDVI_index'])
-            })
-
-        return jsonify({"status": "success", "procesados": len(labels_g)})
+        return jsonify({
+            "estado_riesgo": prediccion_texto.tolist(),
+            "status": "success",
+            "registros_procesados": len(prediccion_texto)
+        })
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        logging.error(f"Error en /predecir: {e}")
+        return jsonify({"error": str(e), "status": "failed"}), 400
 
 
-@app.route('/datos-dashboard', methods=['GET'])
-def get_dashboard():
-    return jsonify(list(historico_datos))
+# Ruta 3: Ventanilla del Agrónomo (Recomendación de Fertilizante)
+@app.route('/recomendar_fertilizante', methods=['POST'])
+def recomendar_fertilizante():
+    try:
+        datos_json = request.get_json()
+
+        # Convertir a DataFrame masivo
+        df_nuevo = pd.DataFrame(datos_json) if isinstance(datos_json, list) else pd.DataFrame([datos_json])
+
+        # Transformación y Predicción Vectorizada
+        datos_procesados = sistemas_ia['pre_agronomo'].transform(df_nuevo)
+        prediccion_numerica = sistemas_ia['modelo_agronomo'].predict(datos_procesados)
+
+        # Decodificar números a las etiquetas originales (ej. "Organic", "Urea")
+        prediccion_texto = sistemas_ia['le_agronomo'].inverse_transform(prediccion_numerica)
+
+        return jsonify({
+            "fertilizante_recomendado": prediccion_texto.tolist(),
+            "status": "success",
+            "registros_procesados": len(prediccion_texto)
+        })
+    except Exception as e:
+        logging.error(f"Error en /recomendar_fertilizante: {e}")
+        return jsonify({"error": str(e), "status": "failed"}), 400
 
 
+# Arrancamos el servidor en el puerto 5000
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # host='0.0.0.0' es necesario para que servicios externos (o simuladores en otra IP) puedan conectarse
+    app.run(host='0.0.0.0', port=5000)
