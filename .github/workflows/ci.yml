@@ -1,4 +1,4 @@
-name: MLOps Integración Continua (CI)
+name: MLOps Integración Continua (CI) / Despliegue Continuo (CD)
 
 # -- cuando se va a ejecutar este workflow 
 on:
@@ -57,8 +57,8 @@ jobs:
       - name: Despliegue en Cloud Run
         uses: google-github-actions/deploy-cloudrun@v1
         with:
-          service: agrosmart-api
-          image: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/agrosmart/api:${{ github.sha }}
+          service: agrosmart-services
+          image: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/agrosmart/services:${{ github.sha }}
           region: us-central1
           flags: '--allow-unauthenticated' # Permite acceso público a la API
 
