@@ -3,6 +3,8 @@ import pandas as pd
 from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from collections import deque
+from services.whatsapp_service import enviar_plantilla_alerta
 import logging
 from google.cloud import bigquery
 import datetime
@@ -126,6 +128,28 @@ def datos_dashboard():
 @app.route('/', methods=['GET'])
 def home(): return jsonify({"status": "AgroSmart Live"})
 
+@app.route('/enviar-alerta-wa', methods=['POST'])
+def despachar_alerta_whatsapp():
+    try:
+        data = request.get_json()
+        telefono = data.get('telefono')
+        riesgo = data.get('riesgo')
+        fertilizante = data.get('fertilizante')
+
+        # Validación
+        if not all([telefono, riesgo, fertilizante]):
+            return jsonify({"error": "Faltan datos"}), 400
+
+        # Llamada a nuestro servicio modularizado
+        resultado = enviar_plantilla_alerta(telefono, riesgo, fertilizante)
+
+        if resultado["success"]:
+            return jsonify({"status": "success", "meta_id": resultado["meta_id"]}), 200
+        else:
+            return jsonify({"status": "error", "detalles": resultado}), 400
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

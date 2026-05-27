@@ -89,22 +89,38 @@ function App() {
     if (!cacheOk) consultarUnaVez();
   }, []);
 
-  const manejarAprobacionAlerta = () => {
-    const mensaje = `🌱 *AgroSmart* - Diagnóstico: ${riesgo}. Acción: Aplicar ${fertilizante}.`;
-    const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-    window.open(urlWhatsApp, '_blank');
+      const manejarAprobacionAlerta = async () => {
+      try {
+        setRiesgo("Enviando vía API...");
 
-    const nuevaAlerta = {
-      id: Date.now(),
-      fecha: new Date().toLocaleString(),
-      lote: "Lote 4 - Sector Norte",
-      diagnostico: riesgo,
-      recomendacion: "Enviado a Campo",
-      estado: "Enviado a Campo"
-    };
+        const payload = {
+          telefono: "51906967430",
+          riesgo: riesgo,
+          fertilizante: fertilizante
+        };
 
-    setHistorialAlertas([nuevaAlerta, ...historialAlertas]);
-  };
+        const response = await fetch('http://localhost:5000/enviar-alerta-wa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const resultado = await response.json();
+
+        // Actualizar historial
+        const nuevaAlerta = {
+          id: Date.now(),
+          fecha: new Date().toLocaleString(),
+          diagnostico: riesgo,
+          recomendacion: fertilizante
+        };
+        setHistorialAlertas([nuevaAlerta, ...historialAlertas]);
+
+      } catch (error) {
+        console.error("Error enviando alerta:", error);
+        setRiesgo("Error al enviar");
+      }
+  }; // ← CIERRE DE LA FUNCIÓN
 
   const contextValue = {
     riesgo,
