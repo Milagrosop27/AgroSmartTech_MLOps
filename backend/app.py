@@ -4,7 +4,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from collections import deque
-from services.whatsapp_service import enviar_plantilla_alerta
+from backend.services.whatsapp_service import enviar_plantilla_alerta
 import logging
 from google.cloud import bigquery
 import datetime
@@ -206,16 +206,17 @@ def verificar_webhook():
 def recibir_eventos_whatsapp():
     try:
         data = request.get_json()
-        from services.webhook_service import procesar_mensaje_entrante
+        from backend.services.webhook_service import procesar_mensaje_entrante
         resultado = procesar_mensaje_entrante(data)
 
         # Si el servicio detectó el clic, guardamos el número en la memoria
         if resultado.get("status") == "confirmado":
             telefono = resultado.get("telefono")
             confirmaciones_whatsapp.append(telefono)
-
+            logging.info(f"¡Acción confirmada por el usuario {telefono}!")
         return jsonify({"status": "recibido"}), 200
     except Exception as e:
+        logging.error(f"Error en el webhook POST: {e}")
         return jsonify({"error": str(e)}), 500
 
 
