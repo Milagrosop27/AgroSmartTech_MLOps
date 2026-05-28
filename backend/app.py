@@ -185,41 +185,6 @@ def despachar_alerta_whatsapp():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/webhook', methods=['GET'])
-def verificar_webhook():
-    # Meta nos enviará un token que nosotros inventaremos
-    TOKEN_SECRETO = "AgroSmart_Secreto_2026"
-    modo = request.args.get('hub.mode')
-    token = request.args.get('hub.verify_token')
-    desafio = request.args.get('hub.challenge')
-
-    if modo and token:
-        if modo == 'subscribe' and token == TOKEN_SECRETO:
-            logging.info("Webhook verificado por Meta exitosamente.")
-            return desafio, 200
-        else:
-            return "Prohibido", 403
-    return "Mala petición", 400
-
-
-# 2. Ruta POST: Para recibir los clics de los agricultores
-@app.route('/webhook', methods=['POST'])
-def recibir_eventos_whatsapp():
-    try:
-        data = request.get_json()
-
-        # Aquí llamamos a tu nuevo archivo de servicios para mantener app.py limpio
-        from services.webhook_service import procesar_mensaje_entrante
-        resultado = procesar_mensaje_entrante(data)
-
-        # A Meta siempre hay que responderle rápido con un 200 OK, sino reintenta el envío
-        return jsonify({"status": "recibido"}), 200
-
-    except Exception as e:
-        logging.error(f"Error en el webhook: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
 # 1. Ruta para que Meta verifique tu servidor
 @app.route('/webhook', methods=['GET'])
 def verificar_webhook():
@@ -266,6 +231,5 @@ def obtener_confirmaciones():
     return jsonify({"confirmadas": copia_confirmadas}), 200
 
 if __name__ == '__main__':
-    # Cloud Run asigna un puerto en la variable de entorno PORT, si no, usa el 8080
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
