@@ -1,5 +1,5 @@
 .venv/
 .idea/
-modelos/*.pkl
+models/*.pkl
 __pycache__/
 data/

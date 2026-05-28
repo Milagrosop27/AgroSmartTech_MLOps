@@ -27,16 +27,16 @@ bq_client = bigquery.Client()
 PROJECT_ID = "agrosmart-tech-mlops"
 TABLE_ID = f"{PROJECT_ID}.agrosmart_data.predicciones_iot"
 
+# Memoria temporal para guardar los números que han confirmado
+confirmaciones_whatsapp = []
 
 def cargar_recursos():
     """Carga los modelos Random Forest, preprocesadores y codificadores"""
     try:
-        # Carga Guardián (Riesgo)
         sistemas_ia['modelo_guardian'] = joblib.load(MODELS_DIR / 'guardian_rf.pkl')
         sistemas_ia['pre_guardian'] = joblib.load(MODELS_DIR / 'preprocesador_guardian.pkl')
         sistemas_ia['le_guardian'] = joblib.load(MODELS_DIR / 'label_encoder_guardian.pkl')
 
-        # Carga Agrónomo (Fertilizante)
         sistemas_ia['modelo_agronomo'] = joblib.load(MODELS_DIR / 'agronomo_rf.pkl')
         sistemas_ia['pre_agronomo'] = joblib.load(MODELS_DIR / 'preprocesador_agronomo.pkl')
         sistemas_ia['le_agronomo'] = joblib.load(MODELS_DIR / 'label_encoder_agronomo.pkl')
@@ -48,7 +48,19 @@ def cargar_recursos():
 
 cargar_recursos()
 
+# --- SISTEMA EXPERTO BASADO EN REGLAS (IoT RIEGO) ---
+def calcular_estado_riego(humedad, temperatura):
+    if humedad < 30 and temperatura > 30:
+        return "Activar Riego de Emergencia (Máx)"
+    elif humedad < 40:
+        return "Activar Riego Moderado (Goteo)"
+    elif humedad > 70:
+        return "Pausar Riego (Riesgo de hongos)"
+    else:
+        return "Humedad Óptima (No requiere riego)"
 
+
+# MODIFICADO: Ahora extrae farm_id y crop_type del simulador
 def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
     try:
         filas = []
@@ -65,7 +77,10 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
                 "ph": round(float(dato.get('soil_pH', 0)), 2),
                 "ndvi": round(float(dato.get('NDVI_index', 0)), 2),
                 "riesgo_enfermedad": str(riesgos[i]),
-                "recomendacion": str(recomendaciones[i])  # <-- NUEVA COLUMNA
+                "recomendacion": str(recomendaciones[i]),
+                # NUEVAS COLUMNAS CAPTURADAS DINÁMICAMENTE DEL SIMULADOR:
+                "farm_id": str(dato.get('farm_id', 'FARM_UNKNOWN')),
+                "crop_type": str(dato.get('crop_type', 'No especificado'))
             }
             filas.append(fila)
 
@@ -91,13 +106,24 @@ def predecir():
         pred_a = sistemas_ia['modelo_agronomo'].predict(proc_a)
         recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a)
 
-        # 3. Guardar ambos en BigQuery
-        guardar_en_bigquery(datos_json, riesgos, recoms)
+        # 3. Fusión de IA + IoT (Fertilizante + Riego)
+        recoms_combinadas = []
+        for i, row in df_nuevo.iterrows():
+            humedad = float(row.get('humidity_%', 0))
+            temperatura = float(row.get('temperature_C', 0))
 
+            accion_riego = calcular_estado_riego(humedad, temperatura)
+            accion_final = f"Aplicar {recoms[i]}. Además: {accion_riego}."
+            recoms_combinadas.append(accion_final)
+
+        # 4. Guardar en BigQuery (Mantiene el flujo estable)
+        guardar_en_bigquery(datos_json, riesgos, recoms_combinadas)
+
+        # EL RETURN SIGUE EXACTAMENTE IGUAL para no romper el simulador IoT
         return jsonify({
-            "estado_riesgo": riesgos.tolist(),  # Cambiamos 'riesgo' por 'estado_riesgo'
+            "estado_riesgo": riesgos.tolist(),
             "status": "success",
-            "registros_procesados": len(riesgos)  # Esto es lo que lee el simulador
+            "registros_procesados": len(riesgos)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -111,6 +137,7 @@ def datos_dashboard():
 
         historico = []
         for row in results:
+            # MODIFICADO: Agregamos farm_id y crop_type al JSON que React va a descargar
             historico.append({
                 "fecha": row.fecha_hora.strftime('%H:%M:%S'),
                 "temp": row.temperatura,
@@ -118,7 +145,9 @@ def datos_dashboard():
                 "ph": row.ph,
                 "ndvi": row.ndvi,
                 "diagnostico": row.riesgo_enfermedad,
-                "recomendacion": getattr(row, 'recomendacion', 'Revisión técnica')
+                "recomendacion": getattr(row, 'recomendacion', 'Revisión técnica'),
+                "farm_id": getattr(row, 'farm_id', 'FARM_UNKNOWN'),
+                "crop_type": getattr(row, 'crop_type', 'No especificado')
             })
         return jsonify(historico[::-1])
     except Exception as e:
@@ -128,20 +157,24 @@ def datos_dashboard():
 @app.route('/', methods=['GET'])
 def home(): return jsonify({"status": "AgroSmart Live"})
 
+
 @app.route('/enviar-alerta-wa', methods=['POST'])
 def despachar_alerta_whatsapp():
     try:
         data = request.get_json()
+
         telefono = data.get('telefono')
         riesgo = data.get('riesgo')
-        fertilizante = data.get('fertilizante')
+        farm_id = data.get('farm_id')
+        cultivo = data.get('cultivo')
+        ndvi = data.get('ndvi')
+        humedad = data.get('humedad')
+        accion = data.get('accion')
 
-        # Validación
-        if not all([telefono, riesgo, fertilizante]):
-            return jsonify({"error": "Faltan datos"}), 400
+        if not all([telefono, riesgo, farm_id, cultivo, ndvi, str(humedad), accion]):
+            return jsonify({"error": "Faltan datos para rellenar la plantilla de Meta"}), 400
 
-        # Llamada a nuestro servicio modularizado
-        resultado = enviar_plantilla_alerta(telefono, riesgo, fertilizante)
+        resultado = enviar_plantilla_alerta(telefono, riesgo, farm_id, cultivo, str(ndvi), str(humedad), accion)
 
         if resultado["success"]:
             return jsonify({"status": "success", "meta_id": resultado["meta_id"]}), 200
@@ -150,6 +183,88 @@ def despachar_alerta_whatsapp():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/webhook', methods=['GET'])
+def verificar_webhook():
+    # Meta nos enviará un token que nosotros inventaremos
+    TOKEN_SECRETO = "AgroSmart_Secreto_2026"
+
+    modo = request.args.get('hub.mode')
+    token = request.args.get('hub.verify_token')
+    desafio = request.args.get('hub.challenge')
+
+    if modo and token:
+        if modo == 'subscribe' and token == TOKEN_SECRETO:
+            logging.info("Webhook verificado por Meta exitosamente.")
+            return desafio, 200
+        else:
+            return "Prohibido", 403
+    return "Mala petición", 400
+
+
+# 2. Ruta POST: Para recibir los clics de los agricultores
+@app.route('/webhook', methods=['POST'])
+def recibir_eventos_whatsapp():
+    try:
+        data = request.get_json()
+
+        # Aquí llamamos a tu nuevo archivo de servicios para mantener app.py limpio
+        from services.webhook_service import procesar_mensaje_entrante
+        resultado = procesar_mensaje_entrante(data)
+
+        # A Meta siempre hay que responderle rápido con un 200 OK, sino reintenta el envío
+        return jsonify({"status": "recibido"}), 200
+
+    except Exception as e:
+        logging.error(f"Error en el webhook: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# 1. Ruta para que Meta verifique tu servidor
+@app.route('/webhook', methods=['GET'])
+def verificar_webhook():
+    TOKEN_SECRETO = "AgroSmart_Secreto_2026"  # Lo usaremos en Meta luego
+    modo = request.args.get('hub.mode')
+    token = request.args.get('hub.verify_token')
+    desafio = request.args.get('hub.challenge')
+
+    if modo and token:
+        if modo == 'subscribe' and token == TOKEN_SECRETO:
+            return desafio, 200
+        else:
+            return "Prohibido", 403
+    return "Mala petición", 400
+
+
+# 2. Ruta que recibe el clic de WhatsApp
+@app.route('/webhook', methods=['POST'])
+def recibir_eventos_whatsapp():
+    try:
+        data = request.get_json()
+        from services.webhook_service import procesar_mensaje_entrante
+        resultado = procesar_mensaje_entrante(data)
+
+        # Si el servicio detectó el clic, guardamos el número en la memoria
+        if resultado.get("status") == "confirmado":
+            telefono = resultado.get("telefono")
+            confirmaciones_whatsapp.append(telefono)
+
+        return jsonify({"status": "recibido"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# 3. Ruta para que React pregunte si hay confirmaciones (Polling)
+@app.route('/api/confirmaciones', methods=['GET'])
+def obtener_confirmaciones():
+    global confirmaciones_whatsapp
+    # Hacemos una copia de las confirmaciones actuales
+    copia_confirmadas = list(confirmaciones_whatsapp)
+    # Limpiamos la memoria para que React no confirme dos veces la misma acción
+    confirmaciones_whatsapp.clear()
+
+    return jsonify({"confirmadas": copia_confirmadas}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
