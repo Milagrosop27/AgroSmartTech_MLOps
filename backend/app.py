@@ -189,7 +189,6 @@ def despachar_alerta_whatsapp():
 def verificar_webhook():
     # Meta nos enviará un token que nosotros inventaremos
     TOKEN_SECRETO = "AgroSmart_Secreto_2026"
-
     modo = request.args.get('hub.mode')
     token = request.args.get('hub.verify_token')
     desafio = request.args.get('hub.challenge')
@@ -267,4 +266,6 @@ def obtener_confirmaciones():
     return jsonify({"confirmadas": copia_confirmadas}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # Cloud Run asigna un puerto en la variable de entorno PORT, si no, usa el 8080
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
