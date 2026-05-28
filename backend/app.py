@@ -9,6 +9,7 @@ import logging
 from google.cloud import bigquery
 import datetime
 import os
+import time
 
 # Inicializamos Flask
 app = Flask(__name__)
@@ -29,6 +30,7 @@ TABLE_ID = f"{PROJECT_ID}.agrosmart_data.predicciones_iot"
 
 # Memoria temporal para guardar los números que han confirmado
 confirmaciones_whatsapp = []
+control_alertas = {}
 
 def cargar_recursos():
     """Carga los modelos Random Forest, preprocesadores y codificadores"""
@@ -47,6 +49,14 @@ def cargar_recursos():
 
 
 cargar_recursos()
+
+def debe_enviar_alerta(farm_id):
+    ahora = time.time()
+    # Si nunca se ha enviado o hace más de 1 hora (3600 seg) que se envió
+    if farm_id not in control_alertas or (ahora - control_alertas[farm_id] > 3600):
+        control_alertas[farm_id] = ahora
+        return True
+    return False
 
 # --- SISTEMA EXPERTO BASADO EN REGLAS (IoT RIEGO) ---
 def calcular_estado_riego(humedad, temperatura):
@@ -111,13 +121,35 @@ def predecir():
         for i, row in df_nuevo.iterrows():
             humedad = float(row.get('humidity_%', 0))
             temperatura = float(row.get('temperature_C', 0))
-
             accion_riego = calcular_estado_riego(humedad, temperatura)
             accion_final = f"Aplicar {recoms[i]}. Además: {accion_riego}."
             recoms_combinadas.append(accion_final)
 
         # 4. Guardar en BigQuery (Mantiene el flujo estable)
         guardar_en_bigquery(datos_json, riesgos, recoms_combinadas)
+
+        # --- DISPARO AUTOMÁTICO DE WHATSAPP ---
+        for i, riesgo in enumerate(riesgos):
+            if riesgo == "Severe":  # Solo si el modelo detecta riesgo alto
+                dato_iot = datos_json[i] if isinstance(datos_json, list) else datos_json
+                farm_id = str(dato_iot.get('farm_id', 'FARM_UNKNOWN'))
+
+                if debe_enviar_alerta(farm_id):
+                    try:
+                        # Asegúrate de poner el número real con formato internacional
+                        # Ejemplo: "51999888777"
+                        enviar_plantilla_alerta(
+                            telefono="51906967430",
+                            riesgo=str(riesgo),
+                            farm_id=farm_id,
+                            cultivo=str(dato_iot.get('crop_type', 'N/A')),
+                            ndvi=str(dato_iot.get('NDVI_index', '0')),
+                            humedad=str(dato_iot.get('humidity_%', '0')),
+                            accion=recoms_combinadas[i]
+                        )
+                        logging.info(f"¡Alerta automática enviada para {farm_id}!")
+                    except Exception as e:
+                        logging.error(f"Error al enviar WA automático: {e}")
 
         # EL RETURN SIGUE EXACTAMENTE IGUAL para no romper el simulador IoT
         return jsonify({
