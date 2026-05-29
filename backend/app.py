@@ -149,28 +149,11 @@ def predecir():
         # 4. Guardar en BigQuery (Mantiene el flujo estable)
         guardar_en_bigquery(datos_json, riesgos, recoms_combinadas)
 
-        # --- DISPARO AUTOMÁTICO DE WHATSAPP ---
-        for i, riesgo in enumerate(riesgos):
-            if riesgo == "Severe":  # Solo si el modelo detecta riesgo alto
-                dato_iot = datos_json[i] if isinstance(datos_json, list) else datos_json
-                farm_id = str(dato_iot.get('farm_id', 'FARM_UNKNOWN'))
+        # NOTA: El WhatsApp SOLO se envía cuando el usuario hace clic en el dashboard
+        # NO se envía automáticamente desde /predecir
+        # El flujo es: Simulador → /predecir (procesa y guarda) → Dashboard muestra → Usuario hace clic → /enviar-alerta-wa
 
-                if debe_enviar_alerta(farm_id):
-                    try:
-                        # Asegúrate de poner el número real con formato internacional
-                        # Ejemplo: "51999888777"
-                        enviar_plantilla_alerta(
-                            telefono="51906967430",
-                            riesgo=str(riesgo),
-                            farm_id=farm_id,
-                            cultivo=str(dato_iot.get('crop_type', 'N/A')),
-                            ndvi=str(dato_iot.get('NDVI_index', '0')),
-                            humedad=str(dato_iot.get('humidity_%', '0')),
-                            accion=recoms_combinadas[i]
-                        )
-                        logging.info(f"¡Alerta automática enviada para {farm_id}!")
-                    except Exception as e:
-                        logging.error(f"Error al enviar WA automático: {e}")
+        logging.info(f"Procesadas {len(riesgos)} predicciones. WhatsApp se enviará cuando el usuario lo solicite desde el dashboard.")
 
         # EL RETURN SIGUE EXACTAMENTE IGUAL para no romper el simulador IoT
         return jsonify({

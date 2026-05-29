@@ -1,12 +1,33 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 // 1. Agregamos el ícono LogOut a tu importación existente
-import { LayoutDashboard, ShieldCheck, Sprout, BellRing, LogOut } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Sprout, BellRing, LogOut, RefreshCw } from 'lucide-react';
 
 // 2. Importaciones de Firebase
 import { auth } from '../config/firebase';
 import { signOut } from 'firebase/auth';
 
-const MainLayout = ({ origenDatos = 'cargando' }) => {
+const MainLayout = ({ origenDatos = 'cargando', ultimaActualizacion = null }) => {
+  const [tiempoTranscurrido, setTiempoTranscurrido] = useState('Nunca');
+
+  useEffect(() => {
+    if (!ultimaActualizacion) return;
+
+    const intervalo = setInterval(() => {
+      const ahora = new Date();
+      const diff = Math.floor((ahora - ultimaActualizacion) / 1000);
+
+      if (diff < 60) {
+        setTiempoTranscurrido(`Hace ${diff}s`);
+      } else if (diff < 3600) {
+        setTiempoTranscurrido(`Hace ${Math.floor(diff / 60)}m`);
+      } else {
+        setTiempoTranscurrido(`Hace ${Math.floor(diff / 3600)}h`);
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalo);
+  }, [ultimaActualizacion]);
 
   // 3. Función para manejar el cierre de sesión
   const manejarCierreSesion = async () => {
@@ -38,12 +59,14 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
 
         {/* CONTENEDOR INFERIOR */}
         <div className="mt-auto pt-6 border-t border-green-700 space-y-6">
-          {/* Indicador de estado original */}
+          {/* Indicador de estado mejorado */}
           <div>
-            <p className="text-xs text-green-200 mb-2">Estado de datos:</p>
-            <span className={`inline-block px-2 py-1 text-white text-xs font-bold rounded ${origenDatos === 'api' ? 'bg-green-500' : origenDatos === 'cache' ? 'bg-blue-500' : 'bg-amber-500'}`}>
-              {origenDatos === 'api' ? '✅ Último registro API' : origenDatos === 'cache' ? '📦 Último registro guardado' : '⚠️ Sin datos'}
-            </span>
+            <p className="text-xs text-green-200 mb-2">Estado de datos (En Tiempo Real):</p>
+            <div className={`flex items-center gap-2 px-2 py-2 text-white text-xs font-bold rounded ${origenDatos === 'api' ? 'bg-green-500' : origenDatos === 'cache' ? 'bg-blue-500' : 'bg-amber-500'}`}>
+              <RefreshCw size={14} className={origenDatos === 'api' ? 'animate-spin' : ''} />
+              <span>{origenDatos === 'api' ? `✅ ${tiempoTranscurrido}` : origenDatos === 'cache' ? '📦 Guardado' : '⚠️ Sin datos'}</span>
+            </div>
+            <p className="text-xs text-green-100 mt-2">Actualización cada 15s</p>
           </div>
 
           {/* 4. Botón de Cerrar Sesión */}
