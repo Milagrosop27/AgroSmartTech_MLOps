@@ -109,14 +109,21 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
 
             filas.append(fila)
 
-        logging.info(f"Filas preparadas para BigQuery: {filas}")
+        logging.info(f"Filas preparadas para BigQuery: {len(filas)}")
 
-        errors = bq_client.insert_rows_json(TABLE_ID, filas)
+        # NUEVA LÓGICA DE FRAGMENTACIÓN (CHUNKING)
+        chunk_size = 500  # Enviamos lotes de 500 en 500 para evitar errores por payload grande
 
-        if errors == []:
-            logging.info("¡Inserción en BigQuery EXITOSA!")
-        else:
-            logging.error(f"FALLO EN BQ: {errors}")
+        for i in range(0, len(filas), chunk_size):
+            chunk = filas[i:i + chunk_size]
+            logging.info(f"Insertando lote {i // chunk_size + 1} con {len(chunk)} filas...")
+
+            errors = bq_client.insert_rows_json(TABLE_ID, chunk)
+
+            if errors:
+                logging.error(f"Error parcial en BigQuery para el lote {i // chunk_size + 1}: {errors}")
+            else:
+                logging.info(f"Lote {i // chunk_size + 1} insertado con éxito.")
 
     except Exception as e:
         logging.error(f"Error CRÍTICO en conexión BQ: {e}")
