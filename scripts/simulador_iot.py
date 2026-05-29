@@ -69,13 +69,13 @@ def generar_y_enviar_microbatch():
 
 # 3. EJECUCIÓN CONTINUA
 if __name__ == '__main__':
-    logging.info("INICIANDO SIMULADOR IOT MASIVO")
+    logging.info("INICIANDO SIMULADOR IOT - 5000 REGISTROS POR ENVÍO")
     logging.info("Presiona Ctrl+C para detener la ejecución.")
 
     try:
         while True:
             generar_y_enviar_microbatch()
-            logging.info("Ciclo completado. Esperando 60 segundos para el siguiente envío...")
-            time.sleep(60)
+            logging.info("Ciclo completado. Esperando 15 segundos para el siguiente envío...")
+            time.sleep(15)
     except KeyboardInterrupt:
         logging.info("Simulador detenido manualmente por el usuario.")

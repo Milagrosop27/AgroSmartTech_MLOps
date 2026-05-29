@@ -120,10 +120,10 @@ function App() {
     // Ejecutar de inmediato al cargar el componente
     consultarUnaVez();
 
-    // Bucle de consulta en tiempo real cada 10 segundos
+    // Bucle de consulta en tiempo real cada 15 segundos para sincronización perfecta con simulador
     const intervalo = setInterval(() => {
       consultarUnaVez();
-    }, 60000);
+    }, 15000);
 
     return () => clearInterval(intervalo);
   }, [usuario]);

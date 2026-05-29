@@ -185,8 +185,7 @@ def predecir():
 @app.route('/datos-dashboard', methods=['GET'])
 def datos_dashboard():
     try:
-        # Agrupamos los miles de datos del mismo segundo en UN solo punto promediado
-        # Ignoramos la data corrupta de pruebas anteriores que tenga corchetes '['
+        # ESTRATEGIA: Primero agrupamos por timestamp, luego retornamos más registros para mejor granularidad
         query = f"""
             SELECT 
                 fecha_hora,
@@ -197,12 +196,13 @@ def datos_dashboard():
                 ANY_VALUE(riesgo_enfermedad) AS riesgo_enfermedad,
                 ANY_VALUE(recomendacion) AS recomendacion,
                 ANY_VALUE(farm_id) AS farm_id,
-                ANY_VALUE(crop_type) AS crop_type
+                ANY_VALUE(crop_type) AS crop_type,
+                COUNT(*) AS cantidad_sensores
             FROM `{TABLE_ID}`
             WHERE riesgo_enfermedad NOT LIKE '%[%'
             GROUP BY fecha_hora
             ORDER BY fecha_hora DESC
-            LIMIT 50
+            LIMIT 100
         """
         results = bq_client.query(query).result()
 
@@ -217,11 +217,13 @@ def datos_dashboard():
                 "diagnostico": row.riesgo_enfermedad,
                 "recomendacion": row.recomendacion,
                 "farm_id": row.farm_id,
-                "crop_type": row.crop_type
+                "crop_type": row.crop_type,
+                "cantidad_registros": row.cantidad_sensores
             })
 
         response = jsonify(historico[::-1])
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        logging.info(f"Dashboard: Retornando {len(historico)} registros agrupados")
         return response
 
     except Exception as e:
