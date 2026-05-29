@@ -16,8 +16,9 @@ const guardian = ({ riesgo, fertilizante, datosSensores }) => {
             <div className="flex justify-between border-b border-slate-700"><span>NDVI</span><span className="text-blue-300">{datosSensores.ndvi}</span></div>
           </div>
         </div>
+
         <div className="lg:col-span-2 bg-white p-6 rounded-xl border shadow-sm">
-          <h3 className="font-bold mb-4">Validación del Modelo XGBoost</h3>
+          <h3 className="font-bold mb-4">Validación del Modelo Random Forest</h3>
           <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-green-500 mb-4">
             <p className="text-xs font-bold text-gray-400">DIAGNÓSTICO IA</p>
             <p className="text-lg font-bold text-gray-800">{riesgo}</p>
