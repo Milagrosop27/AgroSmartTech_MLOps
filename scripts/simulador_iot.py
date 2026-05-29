@@ -43,7 +43,7 @@ def generar_y_enviar_microbatch():
     # Eliminamos variables identificadoras y la variable objetivo de enfermedades (la cual predecirá la IA)
     # Nota: Mantenemos 'fertilizer_type' en el envío porque el modelo Guardian lo necesita como input
     columnas_irrelevantes = [
-        'farm_id', 'sensor_id', 'timestamp', 'sowing_date',
+        'sensor_id', 'timestamp', 'sowing_date',
         'harvest_date', 'latitude', 'longitude', 'crop_disease_status'
     ]
     df_para_api = df_ampliado.drop(columns=columnas_irrelevantes, errors='ignore')

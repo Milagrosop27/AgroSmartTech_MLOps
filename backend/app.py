@@ -180,9 +180,13 @@ def datos_dashboard():
                 "farm_id": getattr(row, 'farm_id', 'FARM_UNKNOWN'),
                 "crop_type": getattr(row, 'crop_type', 'No especificado')
             })
-        return jsonify(historico[::-1]) # Invertimos para que el más antiguo esté a la izquierda del gráfico
+        response = jsonify(historico[::-1])
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
 
 
 @app.route('/', methods=['GET'])

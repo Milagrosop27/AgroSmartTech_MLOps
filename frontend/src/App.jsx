@@ -56,8 +56,8 @@ function App() {
       if (!arregloDatos || arregloDatos.length === 0) return false;
 
       // 1. Llenamos el historial completo para las gráficas y tablas
-      setParcelas(arregloDatos);
-      setHistorialGrafico(arregloDatos);
+      setParcelas([...arregloDatos]);
+      setHistorialGrafico([...arregloDatos]);
 
       // 2. Extraemos SOLO el último registro para la "foto actual" (Tarjetas de arriba)
       const ultimoRegistro = arregloDatos[arregloDatos.length - 1];
