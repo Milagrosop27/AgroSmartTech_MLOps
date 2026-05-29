@@ -1,4 +1,3 @@
-// src/App.jsx
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
@@ -79,11 +78,16 @@ function App() {
     };
 
     const consultarUnaVez = async () => {
-      // Solo consultamos la API si hay un usuario logueado
       if (!usuario) return;
 
       try {
-        const response = await fetch('https://agrosmart-api-940420015515.us-central1.run.app/datos-dashboard');
+        // FIX 1: Ignorar la caché del navegador para traer datos 100% frescos de Cloud Run
+        const response = await fetch(`https://agrosmart-api-940420015515.us-central1.run.app/datos-dashboard?nocache=${new Date().getTime()}`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         const datos = await response.json();
         if (Array.isArray(datos) && datos.length > 0) {
           const ok = aplicarRegistro(datos[datos.length - 1]);
@@ -96,9 +100,16 @@ function App() {
       }
     };
 
-    const cacheOk = cargarDesdeCache();
-    if (!cacheOk) consultarUnaVez();
-  }, [usuario]); // Agregamos 'usuario' a las dependencias para que consulte al loguearse
+    // FIX 2: Ejecutar de inmediato sin preguntar a la memoria local primero
+    consultarUnaVez();
+
+    // FIX 3: Bucle de consulta en tiempo real cada 10 segundos
+    const intervalo = setInterval(() => {
+      consultarUnaVez();
+    }, 10000);
+
+    return () => clearInterval(intervalo);
+  }, [usuario]);
 
   const mostrarNotificacion = (mensaje, tipo = 'success') => {
     setNotificacion({ mostrar: true, mensaje, tipo });
