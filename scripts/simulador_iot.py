@@ -16,7 +16,7 @@ RUTA_DATASET_BASE = DATA_DIR / 'Dataset_Smart_Farming_base.csv'
 
 # URL para producción en Google Cloud Run
 URL_API = "https://agrosmart-api-940420015515.us-central1.run.app/predecir"
-REGISTROS_POR_MINUTO = 100
+REGISTROS_POR_MINUTO = 50000
 
 
 # 2. MOTOR DE SIMULACIÓN

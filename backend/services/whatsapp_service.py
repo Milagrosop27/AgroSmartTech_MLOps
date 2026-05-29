@@ -12,7 +12,7 @@ WA_VERSION = "v25.0"
 # Si no existe, usa tu token actual como respaldo (fallback).
 WA_ACCESS_TOKEN = os.environ.get(
     "WA_ACCESS_TOKEN",
-    "EAAcQ5iEtdekBRhrXAhiYCpVkZA5EpcglGX93TTk6THfHAoLvSbjxN3J7hTVlR0tTZBXJ0WKQGSNZBygGZAQv12jrPJGmu9IPDHwaD7gPKlKZB8xvI4qMIV08U1UyjIRWKlVr3fqNoHpjKBnUng3VUhEZCbNJEZASPsKPZAqJ50gsuJR1kNLzGBIm0Wm8L6ZCHnIicZArHXxUQHOf74hajX1u20VXzrWds8BYjk68pxAd6vwq8aVExNnkq9lBHYhOWNlnMj7fJuwaoh1m4vMmpjjwSwzxEU"
+    "EAAcQ5iEtdekBRrRmkuUIXLrZBwQX7eIL4BMZB82N06roQ17OhdmOtavmxt0Sh1stGdOqiRtNW4l46zZBJHlnA43bSfweyxzaGCirwrlOphVmJGYx5ShV53uw38IQvqg9qKxrXPRjxpsPZC5Xdim4yz3YeIL9vWIBkbwrlFZAu64URYsorV5FoXTTCyrVzvQRKNQZDZD"
 )
 
 def enviar_plantilla_alerta(telefono, riesgo, farm_id, cultivo, ndvi, humedad, accion):
