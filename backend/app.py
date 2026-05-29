@@ -89,24 +89,17 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
         timestamp_ahora = datetime.datetime.utcnow().isoformat()
 
         for i, dato in enumerate(datos_json_lista):
-            # Tomamos valores con defaults seguros
-            temperatura = round(float(dato.get('temperature_C', 0) or 0), 2)
-            humedad = round(float(dato.get('humidity_%', 0) or 0), 2)
-            ph = round(float(dato.get('soil_pH', 0) or 0), 2)
-            ndvi = round(float(dato.get('NDVI_index', 0) or 0), 2)
-
             fila = {
                 "fecha_hora": timestamp_ahora,
-                "temperatura": temperatura,
-                "humedad": humedad,
-                "ph": ph,
-                "ndvi": ndvi,
-                "riesgo_enfermedad": str(riesgos[i]) if i < len(riesgos) else "N/A",
-                "recomendacion": str(recomendaciones[i]) if i < len(recomendaciones) else "N/A",
+                "temperatura": round(float(dato.get('temperature_C', 0)), 2),
+                "humedad": round(float(dato.get('humidity_%', 0)), 2),
+                "ph": round(float(dato.get('soil_pH', 0)), 2),
+                "ndvi": round(float(dato.get('NDVI_index', 0)), 2),
+                "riesgo_enfermedad": str(riesgos[i]),  # <-- EL [i] ES VITAL AQUÍ
+                "recomendacion": str(recomendaciones[i]),  # <-- Y AQUÍ
                 "farm_id": str(dato.get('farm_id', 'FARM_UNKNOWN')),
                 "crop_type": str(dato.get('crop_type', 'No especificado'))
             }
-
             filas.append(fila)
 
         logging.info(f"Filas preparadas para BigQuery: {len(filas)}")
@@ -192,26 +185,47 @@ def predecir():
 @app.route('/datos-dashboard', methods=['GET'])
 def datos_dashboard():
     try:
-        query = f"SELECT * FROM `{TABLE_ID}` ORDER BY fecha_hora DESC LIMIT 500"
+        # Agrupamos los miles de datos del mismo segundo en UN solo punto promediado
+        # Ignoramos la data corrupta de pruebas anteriores que tenga corchetes '['
+        query = f"""
+            SELECT 
+                fecha_hora,
+                AVG(temperatura) AS temperatura,
+                AVG(humedad) AS humedad,
+                AVG(ph) AS ph,
+                AVG(ndvi) AS ndvi,
+                ANY_VALUE(riesgo_enfermedad) AS riesgo_enfermedad,
+                ANY_VALUE(recomendacion) AS recomendacion,
+                ANY_VALUE(farm_id) AS farm_id,
+                ANY_VALUE(crop_type) AS crop_type
+            FROM `{TABLE_ID}`
+            WHERE riesgo_enfermedad NOT LIKE '%[%'
+            GROUP BY fecha_hora
+            ORDER BY fecha_hora DESC
+            LIMIT 50
+        """
         results = bq_client.query(query).result()
 
         historico = []
         for row in results:
             historico.append({
                 "fecha": row.fecha_hora.strftime('%H:%M:%S'),
-                "temp": row.temperatura,
-                "hum": row.humedad,
-                "ph": row.ph,
-                "ndvi": row.ndvi,
+                "temp": round(row.temperatura, 2),
+                "hum": round(row.humedad, 2),
+                "ph": round(row.ph, 2),
+                "ndvi": round(row.ndvi, 2),
                 "diagnostico": row.riesgo_enfermedad,
-                "recomendacion": getattr(row, 'recomendacion', 'Revisión técnica'),
-                "farm_id": getattr(row, 'farm_id', 'FARM_UNKNOWN'),
-                "crop_type": getattr(row, 'crop_type', 'No especificado')
+                "recomendacion": row.recomendacion,
+                "farm_id": row.farm_id,
+                "crop_type": row.crop_type
             })
+
         response = jsonify(historico[::-1])
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
+
     except Exception as e:
+        logging.error(f"Error en dashboard: {e}")
         return jsonify({"error": str(e)}), 500
 
 
