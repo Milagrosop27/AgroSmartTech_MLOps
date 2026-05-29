@@ -1,6 +1,12 @@
+// src/App.jsx
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { CheckCircle, AlertTriangle } from 'lucide-react'; // <-- Importamos iconos para el mensajito
+import { CheckCircle, AlertTriangle } from 'lucide-react';
+
+// === IMPORTACIONES DE FIREBASE ===
+import { auth } from './config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import Login from './views/login.jsx';
 
 import Overview from './views/overview.jsx';
 import Guardian from './views/guardian.jsx';
@@ -10,9 +16,13 @@ import MainLayout from './layouts/MainLayout';
 import AppContext from './context/AppContext';
 
 function App() {
+  // === ESTADOS DE AUTENTICACIÓN ===
+  const [usuario, setUsuario] = useState(null);
+  const [cargandoAuth, setCargandoAuth] = useState(true);
+
+  // === ESTADOS ORIGINALES DE AGROSMART ===
   const [riesgo, setRiesgo] = useState("Esperando...");
   const [fertilizante, setFertilizante] = useState("Esperando...");
-  // ESTADO NUEVO: Para el mensajito flotante (Toast)
   const [notificacion, setNotificacion] = useState({ mostrar: false, mensaje: '', tipo: '' });
 
   const [historialAlertas, setHistorialAlertas] = useState(() => {
@@ -26,6 +36,16 @@ function App() {
   const [parcelas, setParcelas] = useState([]);
   const [origenDatos, setOrigenDatos] = useState("cargando");
 
+  // === OBSERVADOR DE SESIÓN DE FIREBASE ===
+  useEffect(() => {
+    const desubscribir = onAuthStateChanged(auth, (user) => {
+      setUsuario(user);
+      setCargandoAuth(false);
+    });
+    return () => desubscribir();
+  }, []);
+
+  // === LÓGICA ORIGINAL DE AGROSMART ===
   useEffect(() => {
     localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
   }, [historialAlertas]);
@@ -59,6 +79,9 @@ function App() {
     };
 
     const consultarUnaVez = async () => {
+      // Solo consultamos la API si hay un usuario logueado
+      if (!usuario) return;
+
       try {
         const response = await fetch('https://agrosmart-api-940420015515.us-central1.run.app/datos-dashboard');
         const datos = await response.json();
@@ -75,12 +98,10 @@ function App() {
 
     const cacheOk = cargarDesdeCache();
     if (!cacheOk) consultarUnaVez();
-  }, []);
+  }, [usuario]); // Agregamos 'usuario' a las dependencias para que consulte al loguearse
 
-  // Función para mostrar el mensajito flotante
   const mostrarNotificacion = (mensaje, tipo = 'success') => {
     setNotificacion({ mostrar: true, mensaje, tipo });
-    // Se oculta solito después de 4 segundos
     setTimeout(() => {
       setNotificacion({ mostrar: false, mensaje: '', tipo: '' });
     }, 4000);
@@ -110,7 +131,6 @@ function App() {
       const resultado = await response.json();
 
       if (resultado.status === "success") {
-        // MOSTRAMOS EL MENSajITO BONITO EN PANTALLA
         mostrarNotificacion(`¡Alerta enviada correctamente al agricultor del ${registroEspecifico.farm_id}!`);
 
         const idUnico = Date.now();
@@ -125,7 +145,6 @@ function App() {
 
         setHistorialAlertas(prev => [nuevaAlerta, ...prev]);
 
-        // Cronómetro oculto de 60s
         setTimeout(() => {
           setHistorialAlertas(historialActual =>
             historialActual.map(alerta =>
@@ -157,11 +176,25 @@ function App() {
     historialAlertas, setHistorialAlertas, manejarAprobacionAlerta, confirmarAlerta
   };
 
+  // === RENDERIZADO CONDICIONAL DE SEGURIDAD ===
+
+  if (cargandoAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-xl font-medium text-green-700 animate-pulse">
+          Validando credenciales...
+        </div>
+      </div>
+    );
+  }
+
+  if (!usuario) {
+    return <Login />;
+  }
+
   return (
     <Router>
       <AppContext.Provider value={contextValue}>
-
-        {/* === AQUI DIBUJAMOS EL MENSAJITO FLOTANTE (TOAST) === */}
         {notificacion.mostrar && (
           <div className="fixed bottom-10 right-10 z-[9999] transition-all duration-500 ease-in-out">
             <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 text-white font-medium ${notificacion.tipo === 'success' ? 'bg-[#25D366]' : 'bg-red-500'}`}>
@@ -170,7 +203,6 @@ function App() {
             </div>
           </div>
         )}
-        {/* ==================================================== */}
 
         <Routes>
           <Route path="/" element={<MainLayout origenDatos={origenDatos} />}>
