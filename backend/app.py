@@ -70,35 +70,56 @@ def calcular_estado_riego(humedad, temperatura):
         return "Humedad Óptima (No requiere riego)"
 
 
-# MODIFICADO: Ahora extrae farm_id y crop_type del simulador
 def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
     try:
-        filas = []
+        # Aseguramos que el input sea una lista
         if not isinstance(datos_json_lista, list):
             datos_json_lista = [datos_json_lista]
 
+        # Normalizamos riesgos y recomendaciones para que siempre sean listas
+        if not isinstance(riesgos, list):
+            riesgos = [riesgos] * len(datos_json_lista)
+
+        if not isinstance(recomendaciones, list):
+            recomendaciones = [recomendaciones] * len(datos_json_lista)
+
+        logging.info(f"Intentando insertar {len(datos_json_lista)} filas en {TABLE_ID}")
+
+        filas = []
         timestamp_ahora = datetime.datetime.utcnow().isoformat()
 
         for i, dato in enumerate(datos_json_lista):
+            # Tomamos valores con defaults seguros
+            temperatura = round(float(dato.get('temperature_C', 0) or 0), 2)
+            humedad = round(float(dato.get('humidity_%', 0) or 0), 2)
+            ph = round(float(dato.get('soil_pH', 0) or 0), 2)
+            ndvi = round(float(dato.get('NDVI_index', 0) or 0), 2)
+
             fila = {
                 "fecha_hora": timestamp_ahora,
-                "temperatura": round(float(dato.get('temperature_C', 0)), 2),
-                "humedad": round(float(dato.get('humidity_%', 0)), 2),
-                "ph": round(float(dato.get('soil_pH', 0)), 2),
-                "ndvi": round(float(dato.get('NDVI_index', 0)), 2),
-                "riesgo_enfermedad": str(riesgos[i]),
-                "recomendacion": str(recomendaciones[i]),
-                # NUEVAS COLUMNAS CAPTURADAS DINÁMICAMENTE DEL SIMULADOR:
+                "temperatura": temperatura,
+                "humedad": humedad,
+                "ph": ph,
+                "ndvi": ndvi,
+                "riesgo_enfermedad": str(riesgos[i]) if i < len(riesgos) else "N/A",
+                "recomendacion": str(recomendaciones[i]) if i < len(recomendaciones) else "N/A",
                 "farm_id": str(dato.get('farm_id', 'FARM_UNKNOWN')),
                 "crop_type": str(dato.get('crop_type', 'No especificado'))
             }
+
             filas.append(fila)
 
-        errors = bq_client.insert_rows_json(TABLE_ID, filas)
-        if errors: logging.error(f"Errores BQ: {errors}")
-    except Exception as e:
-        logging.error(f"Error conexión BQ: {e}")
+        logging.info(f"Filas preparadas para BigQuery: {filas}")
 
+        errors = bq_client.insert_rows_json(TABLE_ID, filas)
+
+        if errors == []:
+            logging.info("¡Inserción en BigQuery EXITOSA!")
+        else:
+            logging.error(f"FALLO EN BQ: {errors}")
+
+    except Exception as e:
+        logging.error(f"Error CRÍTICO en conexión BQ: {e}")
 
 @app.route('/predecir', methods=['POST'])
 def predecir():
