@@ -164,12 +164,11 @@ def predecir():
 @app.route('/datos-dashboard', methods=['GET'])
 def datos_dashboard():
     try:
-        query = f"SELECT * FROM `{TABLE_ID}` ORDER BY fecha_hora DESC LIMIT 20"
+        query = f"SELECT * FROM `{TABLE_ID}` ORDER BY fecha_hora DESC LIMIT 500"
         results = bq_client.query(query).result()
 
         historico = []
         for row in results:
-            # MODIFICADO: Agregamos farm_id y crop_type al JSON que React va a descargar
             historico.append({
                 "fecha": row.fecha_hora.strftime('%H:%M:%S'),
                 "temp": row.temperatura,
@@ -181,7 +180,7 @@ def datos_dashboard():
                 "farm_id": getattr(row, 'farm_id', 'FARM_UNKNOWN'),
                 "crop_type": getattr(row, 'crop_type', 'No especificado')
             })
-        return jsonify(historico[::-1])
+        return jsonify(historico[::-1]) # Invertimos para que el más antiguo esté a la izquierda del gráfico
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

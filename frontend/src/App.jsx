@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
-// === IMPORTACIONES DE FIREBASE ===
+// IMPORTACIONES DE FIREBASE
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import Login from './views/login.jsx';
@@ -28,6 +28,7 @@ function App() {
     const guardado = localStorage.getItem('agro_history_v1');
     return guardado ? JSON.parse(guardado) : [];
   });
+
   const [datosSensores, setDatosSensores] = useState({
     temp: 0, hum: 0, ph: 0, ndvi: 0,
   });
@@ -44,44 +45,58 @@ function App() {
     return () => desubscribir();
   }, []);
 
-  // === LÓGICA ORIGINAL DE AGROSMART ===
+  // === LÓGICA MODIFICADA DE AGROSMART (HISTORIAL COMPLETO) ===
   useEffect(() => {
     localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
   }, [historialAlertas]);
 
   useEffect(() => {
-    const aplicarRegistro = (registro) => {
-      if (!registro) return false;
-      setParcelas([registro]);
-      setHistorialGrafico([registro]);
-      setRiesgo(registro.crop_disease_status || registro.diagnostico || "Sin diagnóstico");
-      setFertilizante(registro.recomendacion || registro.recommendation || "Sin sugerencia");
+    // NUEVO: Ahora recibimos el arreglo de datos, no solo un registro
+    const aplicarDatos = (arregloDatos) => {
+      if (!arregloDatos || arregloDatos.length === 0) return false;
+
+      // 1. Llenamos el historial completo para las gráficas y tablas
+      setParcelas(arregloDatos);
+      setHistorialGrafico(arregloDatos);
+
+      // 2. Extraemos SOLO el último registro para la "foto actual" (Tarjetas de arriba)
+      const ultimoRegistro = arregloDatos[arregloDatos.length - 1];
+
+      setRiesgo(ultimoRegistro.crop_disease_status || ultimoRegistro.diagnostico || "Sin diagnóstico");
+      setFertilizante(ultimoRegistro.recomendacion || ultimoRegistro.recommendation || "Sin sugerencia");
       setDatosSensores({
-        temp: Number(registro.temperature_C || registro.temp || 0),
-        hum: Number(registro['humidity_%'] || registro.hum || 0),
-        ph: Number(registro.soil_pH || registro.ph || 0),
-        ndvi: Number(registro.NDVI_index || registro.ndvi || 0),
+        temp: Number(ultimoRegistro.temperature_C || ultimoRegistro.temp || 0),
+        hum: Number(ultimoRegistro['humidity_%'] || ultimoRegistro.hum || 0),
+        ph: Number(ultimoRegistro.soil_pH || ultimoRegistro.ph || 0),
+        ndvi: Number(ultimoRegistro.NDVI_index || ultimoRegistro.ndvi || 0),
       });
-      localStorage.setItem('agro_last_record', JSON.stringify(registro));
+
+      // Guardamos en caché el arreglo por si se va el internet
+      localStorage.setItem('agro_last_records', JSON.stringify(arregloDatos));
       return true;
     };
 
     const cargarDesdeCache = () => {
-      const cache = localStorage.getItem('agro_last_record');
+      const cache = localStorage.getItem('agro_last_records'); // Nueva key
       if (!cache) return false;
       try {
-        const registro = JSON.parse(cache);
-        const ok = aplicarRegistro(registro);
+        const arreglo = JSON.parse(cache);
+        // Validamos que sea un arreglo (por compatibilidad con la versión anterior)
+        const datosParseados = Array.isArray(arreglo) ? arreglo : [arreglo];
+        const ok = aplicarDatos(datosParseados);
         if (ok) setOrigenDatos("cache");
         return ok;
-      } catch (error) { return false; }
+      } catch (error) {
+        console.error("Error leyendo caché:", error);
+        return false;
+      }
     };
 
     const consultarUnaVez = async () => {
-      if (!usuario) return;
+      if (!usuario) return; // No consultar si no hay sesión
 
       try {
-        // FIX 1: Ignorar la caché del navegador para traer datos 100% frescos de Cloud Run
+        // Ignorar la caché del navegador para traer datos 100% frescos de Cloud Run
         const response = await fetch(`https://agrosmart-api-940420015515.us-central1.run.app/datos-dashboard?nocache=${new Date().getTime()}`, {
           headers: {
             'Cache-Control': 'no-cache',
@@ -89,28 +104,31 @@ function App() {
           }
         });
         const datos = await response.json();
+
         if (Array.isArray(datos) && datos.length > 0) {
-          const ok = aplicarRegistro(datos[datos.length - 1]);
+          const ok = aplicarDatos(datos);
           if (ok) setOrigenDatos("api");
         } else {
           if (!cargarDesdeCache()) setOrigenDatos("vacío");
         }
       } catch (error) {
+        console.error("Error consultando la API:", error);
         if (!cargarDesdeCache()) setOrigenDatos("vacío");
       }
     };
 
-    // FIX 2: Ejecutar de inmediato sin preguntar a la memoria local primero
+    // Ejecutar de inmediato al cargar el componente
     consultarUnaVez();
 
-    // FIX 3: Bucle de consulta en tiempo real cada 10 segundos
+    // Bucle de consulta en tiempo real cada 10 segundos
     const intervalo = setInterval(() => {
       consultarUnaVez();
-    }, 10000);
+    }, 60000);
 
     return () => clearInterval(intervalo);
   }, [usuario]);
 
+  // === FUNCIONES DE ALERTAS Y NOTIFICACIONES ===
   const mostrarNotificacion = (mensaje, tipo = 'success') => {
     setNotificacion({ mostrar: true, mensaje, tipo });
     setTimeout(() => {
@@ -181,14 +199,14 @@ function App() {
     );
   };
 
+  // === PROVEEDOR DE CONTEXTO ===
   const contextValue = {
     riesgo, setRiesgo, fertilizante, setFertilizante, datosSensores, setDatosSensores,
     historialGrafico, setHistorialGrafico, parcelas, setParcelas, origenDatos, setOrigenDatos,
     historialAlertas, setHistorialAlertas, manejarAprobacionAlerta, confirmarAlerta
   };
 
-  // === RENDERIZADO CONDICIONAL DE SEGURIDAD ===
-
+  // === RENDERIZADO CONDICIONAL DE SESIÓN ===
   if (cargandoAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -203,9 +221,11 @@ function App() {
     return <Login />;
   }
 
+  // === RENDERIZADO PRINCIPAL ===
   return (
     <Router>
       <AppContext.Provider value={contextValue}>
+        {/* Toast Notification Global */}
         {notificacion.mostrar && (
           <div className="fixed bottom-10 right-10 z-[9999] transition-all duration-500 ease-in-out">
             <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 text-white font-medium ${notificacion.tipo === 'success' ? 'bg-[#25D366]' : 'bg-red-500'}`}>
