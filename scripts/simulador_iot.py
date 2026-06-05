@@ -4,6 +4,7 @@ from pathlib import Path
 import requests
 import time
 import logging
+import datetime
 
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -16,7 +17,7 @@ RUTA_DATASET_BASE = DATA_DIR / 'Dataset_Smart_Farming_base.csv'
 
 # URL para producción en Google Cloud Run
 URL_API = "https://agrosmart-api-940420015515.us-central1.run.app/predecir"
-REGISTROS_POR_MINUTO = 50000
+REGISTROS_POR_MINUTO = 100
 
 
 # 2. MOTOR DE SIMULACIÓN
@@ -29,7 +30,7 @@ def generar_y_enviar_microbatch():
         logging.error(f"Archivo no encontrado: {e}")
         return
 
-    # Extraemos 50,000 registros manteniendo la correlación real de las variables
+    # Extraemos registros manteniendo la correlación real de las variables
     df_ampliado = df_base.sample(n=REGISTROS_POR_MINUTO, replace=True).reset_index(drop=True)
 
     # Inyección de ruido estadístico para simular variabilidad natural del clima en tiempo real
@@ -40,10 +41,12 @@ def generar_y_enviar_microbatch():
     df_ampliado['temperature_C'] = df_ampliado['temperature_C'] + ruido_temp
     df_ampliado['humidity_%'] = (df_ampliado['humidity_%'] + ruido_hum).clip(lower=0, upper=100)
 
-    # Eliminamos variables identificadoras y la variable objetivo de enfermedades (la cual predecirá la IA)
-    # Nota: Mantenemos 'fertilizer_type' en el envío porque el modelo Guardian lo necesita como input
+    # 👉 MODIFICACIÓN 1: Le asignamos la hora actual a este lote de simulación
+    df_ampliado['timestamp'] = datetime.datetime.now().isoformat()
+
+    # 👉 MODIFICACIÓN 2: Sacamos 'timestamp' de la lista para que NO se borre
     columnas_irrelevantes = [
-        'sensor_id', 'timestamp', 'sowing_date',
+        'sensor_id', 'sowing_date',
         'harvest_date', 'latitude', 'longitude', 'crop_disease_status'
     ]
     df_para_api = df_ampliado.drop(columns=columnas_irrelevantes, errors='ignore')
@@ -52,15 +55,15 @@ def generar_y_enviar_microbatch():
     df_para_api = df_para_api.replace([np.inf, -np.inf], np.nan).fillna(0)
     payload = df_para_api.to_dict(orient='records')
 
-    logging.info(f"Enviando lote de {len(payload)} registros correlacionados a {URL_API}...")
+    logging.info(f"Enviando lote de {len(payload)} registros a {URL_API}...")
 
     # Transmisión a la API
     try:
         respuesta = requests.post(URL_API, json=payload, timeout=60)
         if respuesta.status_code == 200:
             datos_respuesta = respuesta.json()
-            procesados = datos_respuesta.get('registros_procesados', 0)
-            logging.info(f"Éxito: La API procesó {procesados} registros correctamente.")
+            procesados = datos_respuesta.get('registros_procesados', len(payload))
+            logging.info(f"Éxito: La API procesó los registros correctamente.")
         else:
             logging.error(f"Fallo en la API ({respuesta.status_code}): {respuesta.text}")
     except requests.exceptions.RequestException as e:

@@ -127,6 +127,21 @@ def predecir():
         datos_json = request.get_json()
         df_nuevo = pd.DataFrame(datos_json) if isinstance(datos_json, list) else pd.DataFrame([datos_json])
 
+        # Aseguramos que todas las columnas esperadas por los preprocesadores existan.
+        # Si faltan, las rellenamos con valores por defecto (numéricos = 0, categóricos = 'Unknown').
+        required_columns = [
+            'total_days','P','region','N','irrigation_type','rainfall_mm','soil_moisture_%',
+            'sunlight_hours','K','yield_kg_per_hectare','fertilizer_type','pesticide_usage_ml'
+        ]
+
+        for col in required_columns:
+            if col not in df_nuevo.columns:
+                # Suponemos tipo categórico para columnas que contienen texto
+                if col in ('region', 'irrigation_type', 'fertilizer_type'):
+                    df_nuevo[col] = 'Unknown'
+                else:
+                    df_nuevo[col] = 0
+
         # 1. Predicción Guardián (Riesgo)
         proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
         pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
@@ -168,6 +183,8 @@ def predecir():
 @app.route('/datos-dashboard', methods=['GET'])
 def datos_dashboard():
     try:
+        # Registro explícito para depuración de polling: muestra cuándo el dashboard fue consultado
+        logging.info(f"/datos-dashboard solicitado desde {request.remote_addr} at {datetime.datetime.utcnow().isoformat()}")
         # ESTRATEGIA: Primero agrupamos por timestamp, luego retornamos más registros para mejor granularidad
         query = f"""
             SELECT 

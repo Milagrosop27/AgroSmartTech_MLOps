@@ -1,35 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-// 1. Agregamos el ícono LogOut a tu importación existente
-import { LayoutDashboard, ShieldCheck, Sprout, BellRing, LogOut, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Sprout, BellRing, LogOut, CheckCircle } from 'lucide-react';
 
-// 2. Importaciones de Firebase
+// Importaciones de Firebase
 import { auth } from '../config/firebase';
 import { signOut } from 'firebase/auth';
 
-const MainLayout = ({ origenDatos = 'cargando', ultimaActualizacion = null }) => {
-  const [tiempoTranscurrido, setTiempoTranscurrido] = useState('Nunca');
+const MainLayout = () => {
 
-  useEffect(() => {
-    if (!ultimaActualizacion) return;
-
-    const intervalo = setInterval(() => {
-      const ahora = new Date();
-      const diff = Math.floor((ahora - ultimaActualizacion) / 1000);
-
-      if (diff < 60) {
-        setTiempoTranscurrido(`Hace ${diff}s`);
-      } else if (diff < 3600) {
-        setTiempoTranscurrido(`Hace ${Math.floor(diff / 60)}m`);
-      } else {
-        setTiempoTranscurrido(`Hace ${Math.floor(diff / 3600)}h`);
-      }
-    }, 1000);
-
-    return () => clearInterval(intervalo);
-  }, [ultimaActualizacion]);
-
-  // 3. Función para manejar el cierre de sesión
   const manejarCierreSesion = async () => {
     try {
       await signOut(auth);
@@ -59,17 +36,18 @@ const MainLayout = ({ origenDatos = 'cargando', ultimaActualizacion = null }) =>
 
         {/* CONTENEDOR INFERIOR */}
         <div className="mt-auto pt-6 border-t border-green-700 space-y-6">
-          {/* Indicador de estado mejorado */}
+
+          {/* Indicador de estado para presentación */}
           <div>
-            <p className="text-xs text-green-200 mb-2">Estado de datos (En Tiempo Real):</p>
-            <div className={`flex items-center gap-2 px-2 py-2 text-white text-xs font-bold rounded ${origenDatos === 'api' ? 'bg-green-500' : origenDatos === 'cache' ? 'bg-blue-500' : 'bg-amber-500'}`}>
-              <RefreshCw size={14} className={origenDatos === 'api' ? 'animate-spin' : ''} />
-              <span>{origenDatos === 'api' ? `✅ ${tiempoTranscurrido}` : origenDatos === 'cache' ? '📦 Guardado' : '⚠️ Sin datos'}</span>
+            <p className="text-xs text-green-200 mb-2">Estado de datos:</p>
+            <div className="flex items-center gap-2 px-2 py-2 text-white text-xs font-bold rounded bg-green-500">
+              <CheckCircle size={16} />
+              <span>SISTEMA SINCRONIZADO</span>
             </div>
-            <p className="text-xs text-green-100 mt-2">Actualización cada 15s</p>
+            <p className="text-xs text-green-100 mt-2">Actualización cada 1m</p>
           </div>
 
-          {/* 4. Botón de Cerrar Sesión */}
+          {/* Botón de Cerrar Sesión */}
           <button
             onClick={manejarCierreSesion}
             className="flex w-full items-center gap-3 p-2 rounded text-sm text-green-100 hover:bg-green-800 hover:text-white transition-colors"
