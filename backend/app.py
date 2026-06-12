@@ -4,7 +4,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from collections import deque
-from backend.services.whatsapp_service import enviar_plantilla_alerta
+from services.whatsapp_service import enviar_alerta_twilio
 import logging
 from google.cloud import bigquery
 import datetime
@@ -250,19 +250,23 @@ def despachar_alerta_whatsapp():
         humedad = data.get('humedad')
         accion = data.get('accion')
 
-        if not all([telefono, riesgo, farm_id, cultivo, ndvi, str(humedad), accion]):
-            return jsonify({"error": "Faltan datos para rellenar la plantilla de Meta"}), 400
+        # Validamos que al menos tengamos lo esencial
+        if not all([telefono, riesgo, accion]):
+            return jsonify({"error": "Faltan datos para enviar la alerta"}), 400
 
-        resultado = enviar_plantilla_alerta(telefono, riesgo, farm_id, cultivo, str(ndvi), str(humedad), accion)
+        # Armamos el diagnóstico consolidando los datos que enviaba React
+        diagnostico_completo = f"Riesgo {riesgo} en {cultivo} (Parcela: {farm_id}). Humedad al {humedad}%, Vigor NDVI: {ndvi}."
 
-        if resultado["success"]:
-            return jsonify({"status": "success", "meta_id": resultado["meta_id"]}), 200
+        # Llamamos a tu NUEVA función de Twilio
+        exito, mensaje_o_error = enviar_alerta_twilio(telefono, diagnostico_completo, accion)
+
+        if exito:
+            return jsonify({"status": "success", "sid": mensaje_o_error}), 200
         else:
-            return jsonify({"status": "error", "detalles": resultado}), 400
+            return jsonify({"status": "error", "detalles": mensaje_o_error}), 500
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 # 1. Ruta para que Meta verifique tu servidor
 @app.route('/webhook', methods=['GET'])
