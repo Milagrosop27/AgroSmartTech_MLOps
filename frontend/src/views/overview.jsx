@@ -1,5 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Activity, AlertTriangle, Leaf, MapPin, CloudRain } from 'lucide-react';
+import ManualPrediction from '../components/ui/ManualPrediction.jsx';
 
 const Overview = ({ parcelas = [], manejarAprobacionAlerta }) => {
   const parcelasNormalizadas = (parcelas || []).map((p) => ({
@@ -64,6 +65,7 @@ const Overview = ({ parcelas = [], manejarAprobacionAlerta }) => {
         </div>
       </header>
 
+      {/* --- TARJETAS SUPERIORES --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
         <div className={`${bgRiesgo} p-6 rounded-xl shadow-sm border border-gray-100 flex items-start justify-between`}>
           <div>
@@ -91,6 +93,12 @@ const Overview = ({ parcelas = [], manejarAprobacionAlerta }) => {
         </div>
       </div>
 
+      {/* === AQUÍ INYECTAMOS EL SIMULADOR MANUAL === */}
+      <div className="mb-8">
+        <ManualPrediction />
+      </div>
+
+      {/* --- GRÁFICOS Y MAPAS --- */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
         <div className="lg:col-span-7 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <div className="mb-4"><h4 className="text-lg font-bold text-gray-800">Mapa de Calor Epidemiológico</h4><p className="text-xs text-gray-400">Parcelas geolocalizadas por estado sanitario</p></div>

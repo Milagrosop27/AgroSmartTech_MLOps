@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
+import Record from './views/record.jsx';
 
 // === IMPORTACIONES DE FIREBASE ===
 import { auth } from './config/firebase';
@@ -209,6 +210,7 @@ function App() {
             <Route index element={<Overview parcelas={parcelas} manejarAprobacionAlerta={manejarAprobacionAlerta} />} />
             <Route path="guardian" element={<Guardian riesgo={riesgo} fertilizante={fertilizante} datosSensores={datosSensores} />} />
             <Route path="alertas" element={<Alerts historialAlertas={historialAlertas} manejarAprobacionAlerta={manejarAprobacionAlerta} confirmarAlerta={confirmarAlerta} />} />
+            <Route path="record" element={<Record historialAlertas={historialAlertas} />} />
             <Route path="*" element={<div className="p-10 text-center"><h2 className="text-3xl font-bold text-red-500 mb-4">Ruta no encontrada</h2></div>} />
           </Route>
         </Routes>
