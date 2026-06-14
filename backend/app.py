@@ -289,7 +289,7 @@ def verificar_webhook():
 def recibir_eventos_whatsapp():
     try:
         data = request.get_json()
-        from backend.services.webhook_service import procesar_mensaje_entrante
+        from services.webhook_service import procesar_mensaje_entrante
         resultado = procesar_mensaje_entrante(data)
 
         # Si el servicio detectó el clic, guardamos el número en la memoria
