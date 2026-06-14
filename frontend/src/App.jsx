@@ -122,7 +122,7 @@ function App() {
       if (!registroEspecifico) return;
 
       const payload = {
-        telefono: "51906967430",
+        telefono: "+51906967430",
         riesgo: registroEspecifico.crop_disease_status || riesgo,
         fertilizante: fertilizante,
         farm_id: registroEspecifico.farm_id || "FARM_001",

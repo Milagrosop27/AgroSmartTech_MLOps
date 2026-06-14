@@ -10,7 +10,8 @@ def enviar_alerta_twilio(telefono_destino, riesgo, farm_id, cultivo, ndvi, humed
     twilio_number = os.environ.get('TWILIO_PHONE_NUMBER')
 
     # Aseguramos el formato de WhatsApp
-    destino_formateado = f"whatsapp:{telefono_destino}"
+    numero_limpio = telefono_destino.strip().lstrip('+')
+    destino_formateado = f"whatsapp:+{numero_limpio}"
 
     # Aquí construimos el mensaje con el formato exacto que querías
     mensaje = (
