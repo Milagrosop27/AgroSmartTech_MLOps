@@ -164,12 +164,12 @@ def predecir():
         # 1. Predicción Guardián (Riesgo)
         proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
         pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
-        riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g).tolist()
+        riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g)
 
         # 2. Predicción Agrónomo (Fertilizante)
         proc_a = sistemas_ia['pre_agronomo'].transform(df_nuevo)
         pred_a = sistemas_ia['modelo_agronomo'].predict(proc_a)
-        recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a).tolist()
+        recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a)
 
         # 3. Fusión de IA + IoT (Fertilizante + Riego)
         recoms_combinadas = []
