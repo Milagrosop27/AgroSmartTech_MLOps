@@ -242,6 +242,7 @@ def despachar_alerta_whatsapp():
     try:
         data = request.get_json()
 
+        # Extraemos todos los datos que envía React
         telefono = data.get('telefono')
         riesgo = data.get('riesgo')
         farm_id = data.get('farm_id')
@@ -250,15 +251,13 @@ def despachar_alerta_whatsapp():
         humedad = data.get('humedad')
         accion = data.get('accion')
 
-        # Validamos que al menos tengamos lo esencial
         if not all([telefono, riesgo, accion]):
             return jsonify({"error": "Faltan datos para enviar la alerta"}), 400
 
-        # Armamos el diagnóstico consolidando los datos que enviaba React
-        diagnostico_completo = f"Riesgo {riesgo} en {cultivo} (Parcela: {farm_id}). Humedad al {humedad}%, Vigor NDVI: {ndvi}."
-
-        # Llamamos a tu NUEVA función de Twilio
-        exito, mensaje_o_error = enviar_alerta_twilio(telefono, diagnostico_completo, accion)
+        # Llamamos a Twilio pasándole TODAS las variables individuales
+        exito, mensaje_o_error = enviar_alerta_twilio(
+            telefono, riesgo, farm_id, cultivo, ndvi, humedad, accion
+        )
 
         if exito:
             return jsonify({"status": "success", "sid": mensaje_o_error}), 200
