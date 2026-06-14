@@ -47,60 +47,69 @@ function App() {
     return () => desubscribir();
   }, []);
 
-  // === LÓGICA ORIGINAL DE AGROSMART ===
+  // === PERSISTENCIA DE ALERTAS EN LOCALSTORAGE ===
   useEffect(() => {
     localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
   }, [historialAlertas]);
 
+  // === CARGA DE DATOS DEL DASHBOARD ===
   useEffect(() => {
-    const aplicarRegistro = (registro) => {
-      if (!registro) return false;
-      setParcelas([registro]);
-      setHistorialGrafico([registro]);
-      setRiesgo(registro.crop_disease_status || registro.diagnostico || "Sin diagnóstico");
-      setFertilizante(registro.recomendacion || registro.recommendation || "Sin sugerencia");
+    const aplicarRegistros = (registros) => {
+      if (!Array.isArray(registros) || registros.length === 0) return false;
+
+
+      setParcelas(registros);
+      setHistorialGrafico(registros);
+
+      // Usa el último para mostrar en el resumen del header
+      const ultimoRegistro = registros[registros.length - 1];
+      setRiesgo(ultimoRegistro.crop_disease_status || ultimoRegistro.diagnostico || "Sin diagnóstico");
+      setFertilizante(ultimoRegistro.recomendacion || "Sin sugerencia");
       setDatosSensores({
-        temp: Number(registro.temperature_C || registro.temp || 0),
-        hum: Number(registro['humidity_%'] || registro.hum || 0),
-        ph: Number(registro.soil_pH || registro.ph || 0),
-        ndvi: Number(registro.NDVI_index || registro.ndvi || 0),
+        temp: Number(ultimoRegistro.temperature_C || ultimoRegistro.temp || 0),
+        hum: Number(ultimoRegistro['humidity_%'] || ultimoRegistro.hum || 0),
+        ph: Number(ultimoRegistro.soil_pH || ultimoRegistro.ph || 0),
+        ndvi: Number(ultimoRegistro.NDVI_index || ultimoRegistro.ndvi || 0),
       });
-      localStorage.setItem('agro_last_record', JSON.stringify(registro));
+
+      // Cachea el último registro como respaldo
+      localStorage.setItem('agro_last_record', JSON.stringify(ultimoRegistro));
       return true;
     };
 
-    const cargarDesdeCache = () => {
-      const cache = localStorage.getItem('agro_last_record');
-      if (!cache) return false;
-      try {
-        const registro = JSON.parse(cache);
-        const ok = aplicarRegistro(registro);
-        if (ok) setOrigenDatos("cache");
-        return ok;
-      } catch (error) { return false; }
-    };
-
-    const consultarUnaVez = async () => {
-      // Solo consultamos la API si hay un usuario logueado
+    const consultarDatos = async () => {
+      // Solo consulta si hay usuario logueado
       if (!usuario) return;
 
       try {
         const response = await fetch('https://agrosmart-api-940420015515.us-central1.run.app/datos-dashboard');
         const datos = await response.json();
+
         if (Array.isArray(datos) && datos.length > 0) {
-          const ok = aplicarRegistro(datos[datos.length - 1]);
-          if (ok) setOrigenDatos("api");
+          aplicarRegistros(datos);
+          setOrigenDatos("api");
         } else {
-          if (!cargarDesdeCache()) setOrigenDatos("vacío");
+          setOrigenDatos("vacío");
         }
-      } catch (error) {
-        if (!cargarDesdeCache()) setOrigenDatos("vacío");
+      } catch {
+        // Si la API falla, intenta cargar desde cache
+        const cache = localStorage.getItem('agro_last_record');
+        if (cache) {
+          try {
+            const registroCache = JSON.parse(cache);
+            aplicarRegistros([registroCache]);
+            setOrigenDatos("cache");
+          } catch {
+            setOrigenDatos("error");
+          }
+        } else {
+          setOrigenDatos("error");
+        }
       }
     };
 
-    const cacheOk = cargarDesdeCache();
-    if (!cacheOk) consultarUnaVez();
-  }, [usuario]); // Agregamos 'usuario' a las dependencias para que consulte al loguearse
+    consultarDatos();
+  }, [usuario]);
 
   const mostrarNotificacion = (mensaje, tipo = 'success') => {
     setNotificacion({ mostrar: true, mensaje, tipo });
@@ -147,6 +156,7 @@ function App() {
 
         setHistorialAlertas(prev => [nuevaAlerta, ...prev]);
 
+        // Auto-timeout después de 60 segundos si no hay confirmación
         setTimeout(() => {
           setHistorialAlertas(historialActual =>
             historialActual.map(alerta =>

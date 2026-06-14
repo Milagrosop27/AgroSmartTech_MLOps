@@ -146,7 +146,10 @@ const Overview = ({ parcelas = [], manejarAprobacionAlerta }) => {
           </div>
 
           {(() => {
-            const emergencias = parcelasNormalizadas.filter((r) => ['Severe', 'Mild', 'Moderate'].includes(r.crop_disease_status));
+            const emergencias = parcelasNormalizadas.filter((r) =>
+              ['Severe', 'Mild', 'Moderate'].includes(r.crop_disease_status)
+            );
+
             if (!emergencias.length) return <div className="py-12 text-center text-gray-400">✅ No hay alertas críticas.</div>;
 
             return (
@@ -201,19 +204,15 @@ const Overview = ({ parcelas = [], manejarAprobacionAlerta }) => {
         <div className="lg:col-span-4 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <div className="mb-4">
             <h4 className="text-lg font-bold text-gray-800">Estado de Sectores</h4>
-            <p className="text-xs text-gray-400">Distribución por estado (Saludable / Observación / Crítico)</p>
+            <p className="text-xs text-gray-400">Distribución por estado </p>
           </div>
 
           {(() => {
-            const raw = parcelasNormalizadas || [];
-            const severe = raw.filter((r) => r.crop_disease_status === 'Severe').length;
-            const mild = raw.filter((r) => r.crop_disease_status === 'Mild' || r.crop_disease_status === 'Moderate').length;
-            const healthy = raw.length - severe - mild;
 
             const data = [
-              { name: 'Saludable', value: healthy },
-              { name: 'En Observación', value: mild },
-              { name: 'Crítico', value: severe },
+              { name: 'Saludable', value: healthyCount },
+              { name: 'En Observación', value: mildCount},
+              { name: 'Crítico', value: severeCount },
             ];
 
             const COLORS = ['#16a34a', '#f59e0b', '#dc2626'];
@@ -234,9 +233,9 @@ const Overview = ({ parcelas = [], manejarAprobacionAlerta }) => {
                 </div>
 
                 <div className="mt-4 text-sm text-gray-600">
-                  <div><span className="inline-block w-3 h-3 bg-green-600 mr-2 rounded-full"></span>Saludable: {healthy}</div>
-                  <div className="mt-1"><span className="inline-block w-3 h-3 bg-yellow-500 mr-2 rounded-full"></span>En Observación: {mild}</div>
-                  <div className="mt-1"><span className="inline-block w-3 h-3 bg-red-600 mr-2 rounded-full"></span>Crítico: {severe}</div>
+                  <div><span className="inline-block w-3 h-3 bg-green-600 mr-2 rounded-full"></span>Saludable: {healthyCount}</div>
+                  <div className="mt-1"><span className="inline-block w-3 h-3 bg-yellow-500 mr-2 rounded-full"></span>En Observación: {mildCount}</div>
+                  <div className="mt-1"><span className="inline-block w-3 h-3 bg-red-600 mr-2 rounded-full"></span>Crítico: {severeCount}</div>
                 </div>
               </div>
             );
