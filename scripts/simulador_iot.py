@@ -104,9 +104,17 @@ def aplicar_sesgo_zona(zona: dict, df_base_row: pd.Series) -> dict:
     for campo in campos_agronomicos:
         if campo in df_base_row.index:
             val = df_base_row[campo]
+
+            # Convertir tipos de numpy/pandas a tipos nativos de Python
+            if isinstance(val, (np.integer, np.int64)):
+                val = int(val)
+            elif isinstance(val, (np.floating, np.float64)):
+                val = float(val)
+
             # Evitar NaN / Inf
             if isinstance(val, float) and (np.isnan(val) or np.isinf(val)):
                 val = 0
+
             registro[campo] = val
 
     # Sobreescribimos con valores geo-referenciados
