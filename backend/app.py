@@ -4,7 +4,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from collections import deque
-from services.whatsapp_service import enviar_alerta_twilio
+from backend.services.whatsapp_service import enviar_alerta_twilio
 import logging
 from google.cloud import bigquery
 import datetime
