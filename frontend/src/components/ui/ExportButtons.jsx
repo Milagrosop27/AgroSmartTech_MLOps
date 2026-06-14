@@ -1,4 +1,3 @@
-import React from 'react';
 import { FileText, FileSpreadsheet } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; // <-- Cambio 1: Importación directa

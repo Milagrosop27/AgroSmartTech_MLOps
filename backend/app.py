@@ -25,9 +25,22 @@ MODELS_DIR = BASE_DIR / 'models'
 sistemas_ia = {}
 
 # Inicializamos el cliente de BigQuery
-bq_client = bigquery.Client()
 PROJECT_ID = "agrosmart-tech-mlops"
 TABLE_ID = f"{PROJECT_ID}.agrosmart_data.predicciones_iot"
+
+bq_client = None
+
+def obtener_bq_client():
+    global bq_client
+    if bq_client is None:
+        try:
+            bq_client = bigquery.Client()
+            logging.info("Cliente de BigQuery inicializado correctamente.")
+        except Exception as e:
+            logging.error(f"No se pudo inicializar BigQuery: {e}")
+            bq_client = None
+    return bq_client
+
 
 # Memoria temporal para guardar los números que han confirmado
 confirmaciones_whatsapp = []
@@ -70,14 +83,16 @@ def calcular_estado_riego(humedad, temperatura):
     else:
         return "Humedad Óptima (No requiere riego)"
 
-
 def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
+    client = obtener_bq_client()
+    if client is None:
+        logging.error("BigQuery no disponible. No se pueden guardar los datos.")
+        return
+
     try:
-        # Aseguramos que el input sea una lista
         if not isinstance(datos_json_lista, list):
             datos_json_lista = [datos_json_lista]
 
-        # Normalizamos riesgos y recomendaciones para que siempre sean listas
         if not isinstance(riesgos, list):
             riesgos = [riesgos] * len(datos_json_lista)
 
@@ -90,14 +105,17 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
         timestamp_ahora = datetime.datetime.utcnow().isoformat()
 
         for i, dato in enumerate(datos_json_lista):
+            riesgo = riesgos[i] if i < len(riesgos) else "Desconocido"
+            recomendacion = recomendaciones[i] if i < len(recomendaciones) else "Sin recomendación"
+
             fila = {
                 "fecha_hora": timestamp_ahora,
                 "temperatura": round(float(dato.get('temperature_C', 0)), 2),
                 "humedad": round(float(dato.get('humidity_%', 0)), 2),
                 "ph": round(float(dato.get('soil_pH', 0)), 2),
                 "ndvi": round(float(dato.get('NDVI_index', 0)), 2),
-                "riesgo_enfermedad": str(riesgos[i]),  # <-- EL [i] ES VITAL AQUÍ
-                "recomendacion": str(recomendaciones[i]),  # <-- Y AQUÍ
+                "riesgo_enfermedad": str(riesgo),
+                "recomendacion": str(recomendacion),
                 "farm_id": str(dato.get('farm_id', 'FARM_UNKNOWN')),
                 "crop_type": str(dato.get('crop_type', 'No especificado'))
             }
@@ -105,14 +123,13 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
 
         logging.info(f"Filas preparadas para BigQuery: {len(filas)}")
 
-        # NUEVA LÓGICA DE FRAGMENTACIÓN (CHUNKING)
-        chunk_size = 500  # Enviamos lotes de 500 en 500 para evitar errores por payload grande
+        chunk_size = 500
 
         for i in range(0, len(filas), chunk_size):
             chunk = filas[i:i + chunk_size]
             logging.info(f"Insertando lote {i // chunk_size + 1} con {len(chunk)} filas...")
 
-            errors = bq_client.insert_rows_json(TABLE_ID, chunk)
+            errors = client.insert_rows_json(TABLE_ID, chunk)
 
             if errors:
                 logging.error(f"Error parcial en BigQuery para el lote {i // chunk_size + 1}: {errors}")
@@ -121,6 +138,7 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
 
     except Exception as e:
         logging.error(f"Error CRÍTICO en conexión BQ: {e}")
+
 
 @app.route('/predecir', methods=['POST'])
 def predecir():
@@ -180,32 +198,36 @@ def predecir():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-
 @app.route('/datos-dashboard', methods=['GET'])
 def datos_dashboard():
     try:
-        # Registro explícito para depuración de polling: muestra cuándo el dashboard fue consultado
-        logging.info(f"/datos-dashboard solicitado desde {request.remote_addr} at {datetime.datetime.utcnow().isoformat()}")
-        # ESTRATEGIA: Primero agrupamos por timestamp, luego retornamos más registros para mejor granularidad
+        logging.info(f"/datos-dashboard solicitado desde {request.remote_addr}")
+
+        client = obtener_bq_client()
+        if client is None:
+            return jsonify([])
+
+        # 👉 SIN GROUP BY - Trae TODOS los registros individuales
+        minutos_historico = request.args.get('minutos', default=5, type=int)
+
         query = f"""
             SELECT 
                 fecha_hora,
-                AVG(temperatura) AS temperatura,
-                AVG(humedad) AS humedad,
-                AVG(ph) AS ph,
-                AVG(ndvi) AS ndvi,
-                ANY_VALUE(riesgo_enfermedad) AS riesgo_enfermedad,
-                ANY_VALUE(recomendacion) AS recomendacion,
-                ANY_VALUE(farm_id) AS farm_id,
-                ANY_VALUE(crop_type) AS crop_type,
-                COUNT(*) AS cantidad_sensores
+                temperatura,
+                humedad,
+                ph,
+                ndvi,
+                riesgo_enfermedad,
+                recomendacion,
+                farm_id,
+                crop_type
             FROM `{TABLE_ID}`
             WHERE riesgo_enfermedad NOT LIKE '%[%'
-            GROUP BY fecha_hora
+            AND fecha_hora >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {minutos_historico} MINUTE)
             ORDER BY fecha_hora DESC
-            LIMIT 100
+            LIMIT 500
         """
-        results = bq_client.query(query).result()
+        results = client.query(query).result()
 
         historico = []
         for row in results:
@@ -219,20 +241,21 @@ def datos_dashboard():
                 "recomendacion": row.recomendacion,
                 "farm_id": row.farm_id,
                 "crop_type": row.crop_type,
-                "cantidad_registros": row.cantidad_sensores
+                "temperature_C": round(row.temperatura, 2),
+                "humidity_%": round(row.humedad, 2),
+                "soil_pH": round(row.ph, 2),
+                "NDVI_index": round(row.ndvi, 2),
+                "crop_disease_status": row.riesgo_enfermedad
             })
 
         response = jsonify(historico[::-1])
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        logging.info(f"Dashboard: Retornando {len(historico)} registros agrupados")
+        logging.info(f"Dashboard: Retornando {len(historico)} registros individuales")
         return response
 
     except Exception as e:
         logging.error(f"Error en dashboard: {e}")
         return jsonify({"error": str(e)}), 500
-
-
-
 
 @app.route('/', methods=['GET'])
 def home(): return jsonify({"status": "AgroSmart Live"})
