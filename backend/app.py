@@ -83,6 +83,45 @@ def calcular_estado_riego(humedad, temperatura):
     else:
         return "Humedad Óptima (No requiere riego)"
 
+def _normalizar_lista(val):
+    """
+    Normaliza y aplana valores a una lista de strings:
+    - Convierte numpy arrays con .tolist() si existen
+    - Aplana listas/tuplas anidadas (no itera strings)
+    - Retorna lista de strings
+    """
+    # convertir numpy arrays a lista si aplica
+    if hasattr(val, "tolist") and not isinstance(val, list):
+        try:
+            val = val.tolist()
+        except Exception:
+            pass
+
+    # si es string/bytes, devolverlo como lista
+    if isinstance(val, (str, bytes)):
+        return [str(val)]
+
+    # si no es lista/tupla, envolverlo
+    if not isinstance(val, (list, tuple)):
+        return [str(val)]
+
+    # aplanar anidamientos (nivel 1-2 suficiente para este caso)
+    flat = []
+    for el in val:
+        if hasattr(el, "tolist") and not isinstance(el, list):
+            try:
+                el = el.tolist()
+            except Exception:
+                pass
+
+        if isinstance(el, (list, tuple)):
+            for sub in el:
+                flat.append(str(sub))
+        else:
+            flat.append(str(el))
+    return flat
+
+
 def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
     client = obtener_bq_client()
     if client is None:
@@ -90,21 +129,21 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
         return
 
     try:
+        # Aseguramos que datos_json_lista sea una lista
         if not isinstance(datos_json_lista, list):
             datos_json_lista = [datos_json_lista]
 
-        if not isinstance(riesgos, list):
-            riesgos = [riesgos] * len(datos_json_lista)
+        # Normalizamos y aplanamos los arrays/estructuras de riesgos y recomendaciones
+        riesgos = _normalizar_lista(riesgos)
+        recomendaciones = _normalizar_lista(recomendaciones)
 
-        if not isinstance(recomendaciones, list):
-            recomendaciones = [recomendaciones] * len(datos_json_lista)
-
-        logging.info(f"Intentando insertar {len(datos_json_lista)} filas en {TABLE_ID}")
+        logging.info(f"Guardando {len(datos_json_lista)} registros individuales en {TABLE_ID}.")
 
         filas = []
         timestamp_ahora = datetime.datetime.utcnow().isoformat()
 
         for i, dato in enumerate(datos_json_lista):
+            # Tomamos el valor i-ésimo si existe, sino fallback
             riesgo = riesgos[i] if i < len(riesgos) else "Desconocido"
             recomendacion = recomendaciones[i] if i < len(recomendaciones) else "Sin recomendación"
 
@@ -121,23 +160,23 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
             }
             filas.append(fila)
 
-        logging.info(f"Filas preparadas para BigQuery: {len(filas)}")
+        # Logear un ejemplo para depuración
+        if filas:
+            logging.info(f"Ejemplo fila[0]: {filas[0]}")
 
+        # Insertar en chunks (para evitar payloads gigantes)
         chunk_size = 500
-
-        for i in range(0, len(filas), chunk_size):
-            chunk = filas[i:i + chunk_size]
-            logging.info(f"Insertando lote {i // chunk_size + 1} con {len(chunk)} filas...")
-
+        for start in range(0, len(filas), chunk_size):
+            chunk = filas[start:start + chunk_size]
+            logging.info(f"Insertando lote {start // chunk_size + 1} con {len(chunk)} filas...")
             errors = client.insert_rows_json(TABLE_ID, chunk)
-
             if errors:
-                logging.error(f"Error parcial en BigQuery para el lote {i // chunk_size + 1}: {errors}")
+                logging.error(f"Error parcial en BigQuery para el lote {start // chunk_size + 1}: {errors}")
             else:
-                logging.info(f"Lote {i // chunk_size + 1} insertado con éxito.")
+                logging.info(f"Lote {start // chunk_size + 1} insertado con éxito.")
 
     except Exception as e:
-        logging.error(f"Error CRÍTICO en conexión BQ: {e}")
+        logging.error(f"Error en guardar_en_bigquery: {e}")
 
 
 @app.route('/predecir', methods=['POST'])
