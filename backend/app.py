@@ -4,7 +4,8 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from collections import deque
-from services.whatsapp_service import enviar_alerta_twilio
+from backend.services.whatsapp_service import enviar_alerta_twilio
+from twilio.twiml.messaging_response import MessagingResponse
 import logging
 from google.cloud import bigquery
 import datetime
@@ -242,6 +243,7 @@ def despachar_alerta_whatsapp():
     try:
         data = request.get_json()
 
+        # 1. Extraer los datos
         telefono = data.get('telefono')
         riesgo = data.get('riesgo')
         farm_id = data.get('farm_id')
@@ -250,15 +252,23 @@ def despachar_alerta_whatsapp():
         humedad = data.get('humedad')
         accion = data.get('accion')
 
-        # Validamos que al menos tengamos lo esencial
+        # 2. Validar que lo esencial exista
         if not all([telefono, riesgo, accion]):
-            return jsonify({"error": "Faltan datos para enviar la alerta"}), 400
+            return jsonify({"error": "Faltan datos obligatorios (teléfono, riesgo o acción)"}), 400
 
-        # Armamos el diagnóstico consolidando los datos que enviaba React
+        # 3. Preparar el mensaje (diagnóstico consolidado)
         diagnostico_completo = f"Riesgo {riesgo} en {cultivo} (Parcela: {farm_id}). Humedad al {humedad}%, Vigor NDVI: {ndvi}."
 
-        # Llamamos a tu NUEVA función de Twilio
-        exito, mensaje_o_error = enviar_alerta_twilio(telefono, diagnostico_completo, accion)
+        # 4. Llamar a la función UNA SOLA VEZ
+        exito, mensaje_o_error = enviar_alerta_twilio(
+            telefono_destino=telefono,
+            riesgo=riesgo,
+            farm_id=farm_id,
+            cultivo=cultivo,
+            ndvi=str(ndvi),
+            humedad=str(humedad),
+            accion=accion
+        )
 
         if exito:
             return jsonify({"status": "success", "sid": mensaje_o_error}), 200
@@ -268,42 +278,32 @@ def despachar_alerta_whatsapp():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 1. Ruta para que Meta verifique tu servidor
-@app.route('/webhook', methods=['GET'])
-def verificar_webhook():
-    TOKEN_SECRETO = "AgroSmart_Secreto_2026"  # Lo usaremos en Meta luego
-    modo = request.args.get('hub.mode')
-    token = request.args.get('hub.verify_token')
-    desafio = request.args.get('hub.challenge')
-
-    if modo and token:
-        if modo == 'subscribe' and token == TOKEN_SECRETO:
-            return desafio, 200
-        else:
-            return "Prohibido", 403
-    return "Mala petición", 400
-
-
-# 2. Ruta que recibe el clic de WhatsApp
+#1. Twilio webhook
 @app.route('/webhook', methods=['POST'])
 def recibir_eventos_whatsapp():
     try:
-        data = request.get_json()
-        from services.webhook_service import procesar_mensaje_entrante
+        # 1. Twilio envía los datos como Formulario, no como JSON
+        data = request.form
+        from backend.services.webhook_service import procesar_mensaje_entrante
+
         resultado = procesar_mensaje_entrante(data)
 
-        # Si el servicio detectó el clic, guardamos el número en la memoria
+        # 2. Si el servicio detectó el "CONFIRMAR"
         if resultado.get("status") == "confirmado":
             telefono = resultado.get("telefono")
             confirmaciones_whatsapp.append(telefono)
             logging.info(f"¡Acción confirmada por el usuario {telefono}!")
-        return jsonify({"status": "recibido"}), 200
+
+        # 3. Responderle a Twilio en su idioma (XML) para que no marque error
+        resp = MessagingResponse()
+        return str(resp), 200
+
     except Exception as e:
         logging.error(f"Error en el webhook POST: {e}")
-        return jsonify({"error": str(e)}), 500
+        # Siempre devolver TwiML a Twilio aunque falle
+        return str(MessagingResponse()), 500
 
-
-# 3. Ruta para que React pregunte si hay confirmaciones (Polling)
+# 2. Ruta para que React pregunte si hay confirmaciones (Polling)
 @app.route('/api/confirmaciones', methods=['GET'])
 def obtener_confirmaciones():
     global confirmaciones_whatsapp
