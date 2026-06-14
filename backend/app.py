@@ -164,12 +164,12 @@ def predecir():
         # 1. Predicción Guardián (Riesgo)
         proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
         pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
-        riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g)
+        riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g).tolist()
 
         # 2. Predicción Agrónomo (Fertilizante)
         proc_a = sistemas_ia['pre_agronomo'].transform(df_nuevo)
         pred_a = sistemas_ia['modelo_agronomo'].predict(proc_a)
-        recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a)
+        recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a).tolist()
 
         # 3. Fusión de IA + IoT (Fertilizante + Riego)
         recoms_combinadas = []
@@ -208,7 +208,7 @@ def datos_dashboard():
             return jsonify([])
 
         # 👉 SIN GROUP BY - Trae TODOS los registros individuales
-        minutos_historico = request.args.get('minutos', default=5, type=int)
+        minutos_historico = request.args.get('minutos', default=1440, type=int)
 
         query = f"""
             SELECT 
@@ -233,19 +233,15 @@ def datos_dashboard():
         for row in results:
             historico.append({
                 "fecha": row.fecha_hora.strftime('%H:%M:%S'),
-                "temp": round(row.temperatura, 2),
-                "hum": round(row.humedad, 2),
-                "ph": round(row.ph, 2),
-                "ndvi": round(row.ndvi, 2),
-                "diagnostico": row.riesgo_enfermedad,
-                "recomendacion": row.recomendacion,
-                "farm_id": row.farm_id,
-                "crop_type": row.crop_type,
-                "temperature_C": round(row.temperatura, 2),
-                "humidity_%": round(row.humedad, 2),
-                "soil_pH": round(row.ph, 2),
-                "NDVI_index": round(row.ndvi, 2),
-                "crop_disease_status": row.riesgo_enfermedad
+                "temperature_C": round(float(row.temperatura), 2),
+                "humidity_%": round(float(row.humedad), 2),
+                "soil_pH": round(float(row.ph), 2),
+                "NDVI_index": round(float(row.ndvi), 2),
+                "diagnostico": str(row.riesgo_enfermedad),
+                "recomendacion": str(row.recomendacion),
+                "farm_id": str(row.farm_id),
+                "crop_type": str(row.crop_type),
+                "crop_disease_status": str(row.riesgo_enfermedad)
             })
 
         response = jsonify(historico[::-1])

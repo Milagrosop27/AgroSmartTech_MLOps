@@ -57,7 +57,6 @@ function App() {
     const aplicarRegistros = (registros) => {
       if (!Array.isArray(registros) || registros.length === 0) return false;
 
-
       setParcelas(registros);
       setHistorialGrafico(registros);
 
@@ -66,10 +65,10 @@ function App() {
       setRiesgo(ultimoRegistro.crop_disease_status || ultimoRegistro.diagnostico || "Sin diagnóstico");
       setFertilizante(ultimoRegistro.recomendacion || "Sin sugerencia");
       setDatosSensores({
-        temp: Number(ultimoRegistro.temperature_C || ultimoRegistro.temp || 0),
-        hum: Number(ultimoRegistro['humidity_%'] || ultimoRegistro.hum || 0),
-        ph: Number(ultimoRegistro.soil_pH || ultimoRegistro.ph || 0),
-        ndvi: Number(ultimoRegistro.NDVI_index || ultimoRegistro.ndvi || 0),
+        temp: Number(ultimoRegistro.temperature_C || 0),
+        hum: Number(ultimoRegistro['humidity_%'] || 0),
+        ph: Number(ultimoRegistro.soil_pH || 0),
+        ndvi: Number(ultimoRegistro.NDVI_index || 0),
       });
 
       // Cachea el último registro como respaldo
