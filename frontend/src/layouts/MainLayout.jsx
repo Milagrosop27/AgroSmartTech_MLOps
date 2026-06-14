@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ShieldCheck, Sprout, BellRing, ClipboardList, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
 import { auth } from '../config/firebase';
@@ -7,17 +6,9 @@ import { signOut } from 'firebase/auth';
 const MainLayout = ({ origenDatos = 'cargando' }) => {
   const location = useLocation();
 
-  // Estado para controlar si el sub-menú de Alertas está abierto
-  const [menuAlertasAbierto, setMenuAlertasAbierto] = useState(
-    location.pathname.startsWith('/alertas') || location.pathname === '/record'
-  );
-
-  // Mantiene el menú abierto si navegamos por url directamente
-  useEffect(() => {
-    if (location.pathname.startsWith('/alertas') || location.pathname === '/record') {
-      setMenuAlertasAbierto(true);
-    }
-  }, [location.pathname]);
+  // Esta lógica es suficiente: si la ruta coincide, el menú se despliega automáticamente
+  const menuAlertasAbierto =
+    location.pathname.startsWith('/alertas') || location.pathname === '/record';
 
   const manejarCerrarSesion = async () => {
     try {
@@ -29,8 +20,6 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-
-      {/* BARRA LATERAL (SIDEBAR) */}
       <aside className="w-64 bg-green-600 text-white flex flex-col p-6 fixed h-full z-10">
         <h1 className="text-2xl font-bold mb-10 flex items-center gap-2">
           <Sprout /> AgroSmart
@@ -53,13 +42,11 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
             <span>Guardián</span>
           </NavLink>
 
-          {/* === SECCIÓN DESPLEGABLE: ALERTAS Y REGISTROS === */}
           <div className="flex flex-col">
             <div className="flex items-center relative">
-              {/* Al hacer clic, navega a alertas y abre el submenú */}
+              {/* Al hacer clic solo navegamos, la lógica de abierto la maneja el path */}
               <NavLink
                 to="/alertas"
-                onClick={() => setMenuAlertasAbierto(true)}
                 className={({ isActive }) => `flex items-center justify-between w-full px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/20 font-semibold' : 'hover:bg-white/10'}`}
               >
                 <div className="flex items-center gap-3">
@@ -68,19 +55,13 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
                 </div>
               </NavLink>
 
-              {/* Flechita para colapsar/expandir sin navegar */}
               <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  setMenuAlertasAbierto(!menuAlertasAbierto);
-                }}
-                className="absolute right-4 p-1 text-green-200 hover:text-white transition-colors"
+                className="absolute right-4 p-1 text-green-200 hover:text-white transition-colors cursor-default"
               >
                 {menuAlertasAbierto ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
             </div>
 
-            {/* Sub-item: Registros (Solo visible si el menú está abierto) */}
             {menuAlertasAbierto && (
               <div className="ml-5 mt-1 pl-4 border-l border-green-400 flex flex-col overflow-hidden">
                 <NavLink
@@ -93,11 +74,8 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
               </div>
             )}
           </div>
-          {/* ================================================ */}
-
         </nav>
 
-        {/* PIE DEL MENÚ */}
         <div className="mt-auto border-t border-green-500/50 pt-6">
           <div className="mb-4">
             <p className="text-xs text-green-200 mb-1">Estado de datos:</p>
@@ -116,7 +94,6 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
         </div>
       </aside>
 
-      {/* ÁREA DE CONTENIDO */}
       <main className="flex-1 ml-64 p-8">
         <Outlet />
       </main>

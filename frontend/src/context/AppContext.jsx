@@ -1,3 +1,4 @@
+//appContext
 import { createContext } from 'react';
 
 // Context para compartir estado global de la app (riesgo, parcelas, etc.)

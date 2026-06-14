@@ -12,19 +12,16 @@ import datetime
 import os
 import time
 
-# Inicializamos Flask
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- CONFIGURACIÓN DE RUTAS ---
+# --- CONFIGURACION DE RUTAS ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = BASE_DIR / 'models'
 
-# Diccionario global para mantener los modelos en memoria
 sistemas_ia = {}
 
-# Inicializamos el cliente de BigQuery
 PROJECT_ID = "agrosmart-tech-mlops"
 TABLE_ID = f"{PROJECT_ID}.agrosmart_data.predicciones_iot"
 
@@ -42,31 +39,29 @@ def obtener_bq_client():
     return bq_client
 
 
-# Memoria temporal para guardar los números que han confirmado
 confirmaciones_whatsapp = []
 control_alertas = {}
 
 def cargar_recursos():
-    """Carga los modelos Random Forest, preprocesadores y codificadores"""
+    """Carga los modelos Random Forest, preprocesadores y codificadores."""
     try:
         sistemas_ia['modelo_guardian'] = joblib.load(MODELS_DIR / 'guardian_rf.pkl')
-        sistemas_ia['pre_guardian'] = joblib.load(MODELS_DIR / 'preprocesador_guardian.pkl')
-        sistemas_ia['le_guardian'] = joblib.load(MODELS_DIR / 'label_encoder_guardian.pkl')
+        sistemas_ia['pre_guardian']    = joblib.load(MODELS_DIR / 'preprocesador_guardian.pkl')
+        sistemas_ia['le_guardian']     = joblib.load(MODELS_DIR / 'label_encoder_guardian.pkl')
 
         sistemas_ia['modelo_agronomo'] = joblib.load(MODELS_DIR / 'agronomo_rf.pkl')
-        sistemas_ia['pre_agronomo'] = joblib.load(MODELS_DIR / 'preprocesador_agronomo.pkl')
-        sistemas_ia['le_agronomo'] = joblib.load(MODELS_DIR / 'label_encoder_agronomo.pkl')
+        sistemas_ia['pre_agronomo']    = joblib.load(MODELS_DIR / 'preprocesador_agronomo.pkl')
+        sistemas_ia['le_agronomo']     = joblib.load(MODELS_DIR / 'label_encoder_agronomo.pkl')
 
         logging.info("Sistemas IA cargados correctamente.")
     except Exception as e:
-        logging.error(f"Error crítico al cargar modelos: {e}")
+        logging.error(f"Error critico al cargar modelos: {e}")
 
 
 cargar_recursos()
 
 def debe_enviar_alerta(farm_id):
     ahora = time.time()
-    # Si nunca se ha enviado o hace más de 1 hora (3600 seg) que se envió
     if farm_id not in control_alertas or (ahora - control_alertas[farm_id] > 3600):
         control_alertas[farm_id] = ahora
         return True
@@ -75,37 +70,31 @@ def debe_enviar_alerta(farm_id):
 # --- SISTEMA EXPERTO BASADO EN REGLAS (IoT RIEGO) ---
 def calcular_estado_riego(humedad, temperatura):
     if humedad < 30 and temperatura > 30:
-        return "Activar Riego de Emergencia (Máx)"
+        return "Activar Riego de Emergencia (Max)"
     elif humedad < 40:
         return "Activar Riego Moderado (Goteo)"
     elif humedad > 70:
         return "Pausar Riego (Riesgo de hongos)"
     else:
-        return "Humedad Óptima (No requiere riego)"
+        return "Humedad Optima (No requiere riego)"
 
 def _normalizar_lista(val):
     """
-    Normaliza y aplana valores a una lista de strings:
-    - Convierte numpy arrays con .tolist() si existen
-    - Aplana listas/tuplas anidadas (no itera strings)
-    - Retorna lista de strings
+    Convierte la salida de los modelos a una lista plana de strings.
+    Maneja numpy arrays, listas anidadas y valores escalares.
     """
-    # convertir numpy arrays a lista si aplica
     if hasattr(val, "tolist") and not isinstance(val, list):
         try:
             val = val.tolist()
         except Exception:
             pass
 
-    # si es string/bytes, devolverlo como lista
     if isinstance(val, (str, bytes)):
         return [str(val)]
 
-    # si no es lista/tupla, envolverlo
     if not isinstance(val, (list, tuple)):
         return [str(val)]
 
-    # aplanar anidamientos (nivel 1-2 suficiente para este caso)
     flat = []
     for el in val:
         if hasattr(el, "tolist") and not isinstance(el, list):
@@ -113,7 +102,6 @@ def _normalizar_lista(val):
                 el = el.tolist()
             except Exception:
                 pass
-
         if isinstance(el, (list, tuple)):
             for sub in el:
                 flat.append(str(sub))
@@ -129,51 +117,46 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
         return
 
     try:
-        # Aseguramos que datos_json_lista sea una lista
         if not isinstance(datos_json_lista, list):
             datos_json_lista = [datos_json_lista]
 
-        # Normalizamos y aplanamos los arrays/estructuras de riesgos y recomendaciones
-        riesgos = _normalizar_lista(riesgos)
+        riesgos        = _normalizar_lista(riesgos)
         recomendaciones = _normalizar_lista(recomendaciones)
 
-        logging.info(f"Guardando {len(datos_json_lista)} registros individuales en {TABLE_ID}.")
+        logging.info(f"Guardando {len(datos_json_lista)} registros en {TABLE_ID}.")
 
         filas = []
         timestamp_ahora = datetime.datetime.utcnow().isoformat()
 
         for i, dato in enumerate(datos_json_lista):
-            # Tomamos el valor i-ésimo si existe, sino fallback
-            riesgo = riesgos[i] if i < len(riesgos) else "Desconocido"
-            recomendacion = recomendaciones[i] if i < len(recomendaciones) else "Sin recomendación"
+            riesgo       = riesgos[i]        if i < len(riesgos)         else "Desconocido"
+            recomendacion = recomendaciones[i] if i < len(recomendaciones) else "Sin recomendacion"
 
             fila = {
-                "fecha_hora": timestamp_ahora,
-                "temperatura": round(float(dato.get('temperature_C', 0)), 2),
-                "humedad": round(float(dato.get('humidity_%', 0)), 2),
-                "ph": round(float(dato.get('soil_pH', 0)), 2),
-                "ndvi": round(float(dato.get('NDVI_index', 0)), 2),
+                "fecha_hora":       timestamp_ahora,
+                "temperatura":      round(float(dato.get('temperature_C', 0)), 2),
+                "humedad":          round(float(dato.get('humidity_%', 0)), 2),
+                "ph":               round(float(dato.get('soil_pH', 0)), 2),
+                "ndvi":             round(float(dato.get('NDVI_index', 0)), 2),
                 "riesgo_enfermedad": str(riesgo),
-                "recomendacion": str(recomendacion),
-                "farm_id": str(dato.get('farm_id', 'FARM_UNKNOWN')),
-                "crop_type": str(dato.get('crop_type', 'No especificado'))
+                "recomendacion":    str(recomendacion),
+                "farm_id":          str(dato.get('farm_id', 'FARM_UNKNOWN')),
+                "crop_type":        str(dato.get('crop_type', 'No especificado'))
             }
             filas.append(fila)
 
-        # Logear un ejemplo para depuración
         if filas:
             logging.info(f"Ejemplo fila[0]: {filas[0]}")
 
-        # Insertar en chunks (para evitar payloads gigantes)
         chunk_size = 500
         for start in range(0, len(filas), chunk_size):
             chunk = filas[start:start + chunk_size]
             logging.info(f"Insertando lote {start // chunk_size + 1} con {len(chunk)} filas...")
             errors = client.insert_rows_json(TABLE_ID, chunk)
             if errors:
-                logging.error(f"Error parcial en BigQuery para el lote {start // chunk_size + 1}: {errors}")
+                logging.error(f"Error en lote {start // chunk_size + 1}: {errors}")
             else:
-                logging.info(f"Lote {start // chunk_size + 1} insertado con éxito.")
+                logging.info(f"Lote {start // chunk_size + 1} insertado con exito.")
 
     except Exception as e:
         logging.error(f"Error en guardar_en_bigquery: {e}")
@@ -185,60 +168,67 @@ def predecir():
         datos_json = request.get_json()
         df_nuevo = pd.DataFrame(datos_json) if isinstance(datos_json, list) else pd.DataFrame([datos_json])
 
-        # Aseguramos que todas las columnas esperadas por los preprocesadores existan.
-        # Si faltan, las rellenamos con valores por defecto (numéricos = 0, categóricos = 'Unknown').
         required_columns = [
-            'total_days','P','region','N','irrigation_type','rainfall_mm','soil_moisture_%',
-            'sunlight_hours','K','yield_kg_per_hectare','fertilizer_type','pesticide_usage_ml'
+            'total_days', 'P', 'region', 'N', 'irrigation_type', 'rainfall_mm',
+            'soil_moisture_%', 'sunlight_hours', 'K', 'yield_kg_per_hectare',
+            'fertilizer_type', 'pesticide_usage_ml'
         ]
-
         for col in required_columns:
             if col not in df_nuevo.columns:
-                # Suponemos tipo categórico para columnas que contienen texto
                 if col in ('region', 'irrigation_type', 'fertilizer_type'):
                     df_nuevo[col] = 'Unknown'
                 else:
                     df_nuevo[col] = 0
 
-        # 1. Predicción Guardián (Riesgo)
-        proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
-        pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
+        # Prediccion Guardian (riesgo de enfermedad)
+        proc_g  = sistemas_ia['pre_guardian'].transform(df_nuevo)
+        pred_g  = sistemas_ia['modelo_guardian'].predict(proc_g)
         riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g)
 
-        # 2. Predicción Agrónomo (Fertilizante)
+        # Prediccion Agronomo (recomendacion de fertilizante)
         proc_a = sistemas_ia['pre_agronomo'].transform(df_nuevo)
         pred_a = sistemas_ia['modelo_agronomo'].predict(proc_a)
         recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a)
 
-        # 3. Fusión de IA + IoT (Fertilizante + Riego)
+        # Fusion IA + reglas IoT (fertilizante + estado de riego)
         recoms_combinadas = []
         for i, row in df_nuevo.iterrows():
-            humedad = float(row.get('humidity_%', 0))
+            humedad     = float(row.get('humidity_%', 0))
             temperatura = float(row.get('temperature_C', 0))
             accion_riego = calcular_estado_riego(humedad, temperatura)
-            accion_final = f"Aplicar {recoms[i]}. Además: {accion_riego}."
-            recoms_combinadas.append(accion_final)
+            recoms_combinadas.append(f"Aplicar {recoms[i]}. Ademas: {accion_riego}.")
 
-        # 4. Guardar en BigQuery (Mantiene el flujo estable)
         guardar_en_bigquery(datos_json, riesgos, recoms_combinadas)
 
-        # NOTA: El WhatsApp SOLO se envía cuando el usuario hace clic en el dashboard
-        # NO se envía automáticamente desde /predecir
-        # El flujo es: Simulador → /predecir (procesa y guarda) → Dashboard muestra → Usuario hace clic → /enviar-alerta-wa
+        logging.info(f"Procesadas {len(riesgos)} predicciones.")
 
-        logging.info(f"Procesadas {len(riesgos)} predicciones. WhatsApp se enviará cuando el usuario lo solicite desde el dashboard.")
-
-        # EL RETURN SIGUE EXACTAMENTE IGUAL para no romper el simulador IoT
         return jsonify({
-            "estado_riesgo": riesgos.tolist(),
-            "status": "success",
+            "estado_riesgo":       riesgos.tolist(),
+            "status":              "success",
             "registros_procesados": len(riesgos)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+
 @app.route('/datos-dashboard', methods=['GET'])
 def datos_dashboard():
+    """
+    Retorna el historico de predicciones desde BigQuery.
+
+    Parametros opcionales (query string):
+      - minutos  : ventana temporal en minutos (default 1440 = 24h)
+      - hectarea : filtra por hectarea, ej. ?hectarea=H1
+                   Si se omite, devuelve todas las hectareas.
+      - sector   : filtra por sector especifico dentro de la hectarea,
+                   ej. ?hectarea=H1&sector=S03
+                   Si se omite, devuelve todos los sectores de la hectarea.
+
+    Logica de filtrado:
+      - Sin parametros           → todos los farm_id
+      - ?hectarea=H1             → farm_id LIKE 'H1_%'  (los 10 sectores de H1)
+      - ?hectarea=H1&sector=S03  → farm_id = 'H1_S03'  (un sector exacto)
+    """
     try:
         logging.info(f"/datos-dashboard solicitado desde {request.remote_addr}")
 
@@ -246,11 +236,38 @@ def datos_dashboard():
         if client is None:
             return jsonify([])
 
-        # 👉 SIN GROUP BY - Trae TODOS los registros individuales
-        minutos_historico = request.args.get('minutos', default=1440, type=int)
+        minutos_historico = request.args.get('minutos',   default=1440, type=int)
+        hectarea          = request.args.get('hectarea',  default=None, type=str)
+        sector            = request.args.get('sector',    default=None, type=str)
+
+        # --- Construccion del filtro de zona ---
+        # Se usa parametros posicionales de BigQuery (@param) para evitar SQL injection.
+        filtro_zona  = ""
+        query_params = []
+
+        if hectarea and sector:
+            # Sector exacto: farm_id = 'H1_S03'
+            farm_id_exacto = f"{hectarea.upper()}_{sector.upper()}"
+            filtro_zona    = "AND farm_id = @farm_id"
+            query_params.append(
+                bigquery.ScalarQueryParameter("farm_id", "STRING", farm_id_exacto)
+            )
+            logging.info(f"Filtro aplicado: sector exacto → {farm_id_exacto}")
+
+        elif hectarea:
+            # Todos los sectores de la hectarea: farm_id LIKE 'H1_%'
+            prefijo     = f"{hectarea.upper()}_"
+            filtro_zona = "AND STARTS_WITH(farm_id, @prefijo)"
+            query_params.append(
+                bigquery.ScalarQueryParameter("prefijo", "STRING", prefijo)
+            )
+            logging.info(f"Filtro aplicado: hectarea → {prefijo}*")
+
+        else:
+            logging.info("Sin filtro de zona: retornando todas las hectareas.")
 
         query = f"""
-            SELECT 
+            SELECT
                 fecha_hora,
                 temperatura,
                 humedad,
@@ -262,38 +279,105 @@ def datos_dashboard():
                 crop_type
             FROM `{TABLE_ID}`
             WHERE riesgo_enfermedad NOT LIKE '%[%'
-            AND fecha_hora >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {minutos_historico} MINUTE)
+            AND fecha_hora >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @minutos MINUTE)
+            {filtro_zona}
             ORDER BY fecha_hora DESC
             LIMIT 500
         """
-        results = client.query(query).result()
+
+        # Agregamos el parametro de minutos al inicio de la lista
+        query_params.insert(0,
+            bigquery.ScalarQueryParameter("minutos", "INT64", minutos_historico)
+        )
+
+        job_config = bigquery.QueryJobConfig(query_parameters=query_params)
+        results    = client.query(query, job_config=job_config).result()
 
         historico = []
         for row in results:
             historico.append({
-                "fecha": row.fecha_hora.strftime('%H:%M:%S'),
-                "temperature_C": round(float(row.temperatura), 2),
-                "humidity_%": round(float(row.humedad), 2),
-                "soil_pH": round(float(row.ph), 2),
-                "NDVI_index": round(float(row.ndvi), 2),
-                "diagnostico": str(row.riesgo_enfermedad),
-                "recomendacion": str(row.recomendacion),
-                "farm_id": str(row.farm_id),
-                "crop_type": str(row.crop_type),
+                "fecha":              row.fecha_hora.strftime('%H:%M:%S'),
+                "temperature_C":      round(float(row.temperatura), 2),
+                "humidity_%":         round(float(row.humedad), 2),
+                "soil_pH":            round(float(row.ph), 2),
+                "NDVI_index":         round(float(row.ndvi), 2),
+                "diagnostico":        str(row.riesgo_enfermedad),
+                "recomendacion":      str(row.recomendacion),
+                "farm_id":            str(row.farm_id),
+                "crop_type":          str(row.crop_type),
                 "crop_disease_status": str(row.riesgo_enfermedad)
             })
 
         response = jsonify(historico[::-1])
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        logging.info(f"Dashboard: Retornando {len(historico)} registros individuales")
+        logging.info(f"Dashboard: retornando {len(historico)} registros.")
         return response
 
     except Exception as e:
         logging.error(f"Error en dashboard: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/zonas', methods=['GET'])
+def obtener_zonas():
+    """
+    Devuelve el catalogo de hectareas y sectores activos en BigQuery.
+
+    React lo usa para construir el selector de hectareas/sectores
+    sin necesidad de hardcodear los IDs en el frontend.
+
+    Respuesta ejemplo:
+    {
+      "hectareas": ["H1", "H2", "H3", "H4", "H5"],
+      "sectores_por_hectarea": {
+        "H1": ["H1_S01", "H1_S02", ...],
+        ...
+      }
+    }
+    """
+    try:
+        client = obtener_bq_client()
+        if client is None:
+            return jsonify({"error": "BigQuery no disponible"}), 500
+
+        # Consultamos los farm_id distintos presentes en la ultima hora
+        # para evitar mostrar zonas sin actividad reciente
+        query = f"""
+            SELECT DISTINCT farm_id
+            FROM `{TABLE_ID}`
+            WHERE farm_id != 'FARM_UNKNOWN'
+            AND fecha_hora >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 120 MINUTE)
+            ORDER BY farm_id
+        """
+        results = client.query(query).result()
+
+        sectores_por_hectarea = {}
+        for row in results:
+            fid = str(row.farm_id)
+            # farm_id tiene formato "H1_S01"
+            partes = fid.split("_")
+            if len(partes) == 2:
+                h_id = partes[0]
+                if h_id not in sectores_por_hectarea:
+                    sectores_por_hectarea[h_id] = []
+                sectores_por_hectarea[h_id].append(fid)
+
+        hectareas = sorted(sectores_por_hectarea.keys())
+
+        logging.info(f"/api/zonas: {len(hectareas)} hectareas activas.")
+        return jsonify({
+            "hectareas":              hectareas,
+            "sectores_por_hectarea":  sectores_por_hectarea
+        })
+
+    except Exception as e:
+        logging.error(f"Error en /api/zonas: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/', methods=['GET'])
-def home(): return jsonify({"status": "AgroSmart Live"})
+def home():
+    return jsonify({"status": "AgroSmart Live"})
 
 
 @app.route('/enviar-alerta-wa', methods=['POST'])
@@ -301,23 +385,17 @@ def despachar_alerta_whatsapp():
     try:
         data = request.get_json()
 
-        # 1. Extraer los datos
         telefono = data.get('telefono')
-        riesgo = data.get('riesgo')
-        farm_id = data.get('farm_id')
-        cultivo = data.get('cultivo')
-        ndvi = data.get('ndvi')
-        humedad = data.get('humedad')
-        accion = data.get('accion')
+        riesgo   = data.get('riesgo')
+        farm_id  = data.get('farm_id')
+        cultivo  = data.get('cultivo')
+        ndvi     = data.get('ndvi')
+        humedad  = data.get('humedad')
+        accion   = data.get('accion')
 
-        # 2. Validar que lo esencial exista
         if not all([telefono, riesgo, accion]):
-            return jsonify({"error": "Faltan datos obligatorios (teléfono, riesgo o acción)"}), 400
+            return jsonify({"error": "Faltan datos obligatorios (telefono, riesgo o accion)"}), 400
 
-        # 3. Preparar el mensaje (diagnóstico consolidado)
-        diagnostico_completo = f"Riesgo {riesgo} en {cultivo} (Parcela: {farm_id}). Humedad al {humedad}%, Vigor NDVI: {ndvi}."
-
-        # 4. Llamar a la función UNA SOLA VEZ
         exito, mensaje_o_error = enviar_alerta_twilio(
             telefono_destino=telefono,
             riesgo=riesgo,
@@ -336,41 +414,35 @@ def despachar_alerta_whatsapp():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-#1. Twilio webhook
+
 @app.route('/webhook', methods=['POST'])
 def recibir_eventos_whatsapp():
     try:
-        # 1. Twilio envía los datos como Formulario, no como JSON
         data = request.form
         from backend.services.webhook_service import procesar_mensaje_entrante
 
         resultado = procesar_mensaje_entrante(data)
 
-        # 2. Si el servicio detectó el "CONFIRMAR"
         if resultado.get("status") == "confirmado":
             telefono = resultado.get("telefono")
             confirmaciones_whatsapp.append(telefono)
-            logging.info(f"¡Acción confirmada por el usuario {telefono}!")
+            logging.info(f"Accion confirmada por el usuario {telefono}.")
 
-        # 3. Responderle a Twilio en su idioma (XML) para que no marque error
         resp = MessagingResponse()
         return str(resp), 200
 
     except Exception as e:
         logging.error(f"Error en el webhook POST: {e}")
-        # Siempre devolver TwiML a Twilio aunque falle
         return str(MessagingResponse()), 500
 
-# 2. Ruta para que React pregunte si hay confirmaciones (Polling)
+
 @app.route('/api/confirmaciones', methods=['GET'])
 def obtener_confirmaciones():
     global confirmaciones_whatsapp
-    # Hacemos una copia de las confirmaciones actuales
     copia_confirmadas = list(confirmaciones_whatsapp)
-    # Limpiamos la memoria para que React no confirme dos veces la misma acción
     confirmaciones_whatsapp.clear()
-
     return jsonify({"confirmadas": copia_confirmadas}), 200
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

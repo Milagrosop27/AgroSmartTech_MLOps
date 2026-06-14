@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import Record from './views/record.jsx';
 
-// IMPORTACIONES DE FIREBASE (¡NO TOCAR!)
+// FIREBASE 
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import Login from './views/login.jsx';
@@ -15,13 +15,14 @@ import Alerts from './views/alerts.jsx';
 
 import MainLayout from './layouts/MainLayout';
 import AppContext from './context/AppContext';
+import { getDashboard, getZonas } from './services/api';
 
 function App() {
-  // === ESTADOS DE AUTENTICACIÓN ===
+  // === AUTENTICACION ===
   const [usuario, setUsuario] = useState(null);
   const [cargandoAuth, setCargandoAuth] = useState(true);
 
-  // === ESTADOS ORIGINALES DE AGROSMART ===
+  // === ESTADO DE AGROSMART ===
   const [riesgo, setRiesgo] = useState("Esperando...");
   const [fertilizante, setFertilizante] = useState("Esperando...");
   const [notificacion, setNotificacion] = useState({ mostrar: false, mensaje: '', tipo: '' });
@@ -31,14 +32,18 @@ function App() {
     return guardado ? JSON.parse(guardado) : [];
   });
 
-  const [datosSensores, setDatosSensores] = useState({
-    temp: 0, hum: 0, ph: 0, ndvi: 0,
-  });
+  const [datosSensores, setDatosSensores] = useState({ temp: 0, hum: 0, ph: 0, ndvi: 0 });
   const [historialGrafico, setHistorialGrafico] = useState([]);
   const [parcelas, setParcelas] = useState([]);
   const [origenDatos, setOrigenDatos] = useState("cargando");
 
-  // === OBSERVADOR DE SESIÓN DE FIREBASE ===
+  // === ESTADO DE SELECCION DE ZONA (FASE 3) ===
+  // hectareaSeleccionada: null = todas | "H1" = filtrado
+  const [hectareaSeleccionada, setHectareaSeleccionada] = useState(null);
+  // zonas: catalogo completo devuelto por /api/zonas
+  const [zonas, setZonas] = useState({ hectareas: [], sectores_por_hectarea: {} });
+
+  // === OBSERVADOR DE SESION FIREBASE ===
   useEffect(() => {
     const desubscribir = onAuthStateChanged(auth, (user) => {
       setUsuario(user);
@@ -47,58 +52,79 @@ function App() {
     return () => desubscribir();
   }, []);
 
-  // === PERSISTENCIA DE ALERTAS EN LOCALSTORAGE ===
+  // === PERSISTENCIA DE ALERTAS ===
   useEffect(() => {
     localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
   }, [historialAlertas]);
 
-  // === CARGA DE DATOS DEL DASHBOARD ===
+  // === CARGA DE CATALOGO DE ZONAS (una sola vez al iniciar sesion) ===
   useEffect(() => {
+    if (!usuario) return;
+    const cargarZonas = async () => {
+      try {
+        const { data } = await getZonas();
+        if (data?.hectareas?.length > 0) {
+          setZonas(data);
+        }
+      } catch (err) {
+        console.warn("No se pudo cargar el catalogo de zonas:", err);
+      }
+    };
+    cargarZonas();
+  }, [usuario]);
+
+  // === CARGA DE DATOS DEL DASHBOARD ===
+  // Se re-ejecuta cuando cambia el usuario o la hectarea seleccionada
+  useEffect(() => {
+    if (!usuario) return;
+
     const aplicarRegistros = (registros) => {
       if (!Array.isArray(registros) || registros.length === 0) return false;
 
       setParcelas(registros);
       setHistorialGrafico(registros);
 
-      // Usa el último para mostrar en el resumen del header
       const ultimoRegistro = registros[registros.length - 1];
-      setRiesgo(ultimoRegistro.crop_disease_status || ultimoRegistro.diagnostico || "Sin diagnóstico");
+      setRiesgo(ultimoRegistro.crop_disease_status || ultimoRegistro.diagnostico || "Sin diagnostico");
       setFertilizante(ultimoRegistro.recomendacion || "Sin sugerencia");
       setDatosSensores({
-        temp: Number(ultimoRegistro.temperature_C || 0),
-        hum: Number(ultimoRegistro['humidity_%'] || 0),
-        ph: Number(ultimoRegistro.soil_pH || 0),
-        ndvi: Number(ultimoRegistro.NDVI_index || 0),
+        temp:  Number(ultimoRegistro.temperature_C       || 0),
+        hum:   Number(ultimoRegistro['humidity_%']       || 0),
+        ph:    Number(ultimoRegistro.soil_pH             || 0),
+        ndvi:  Number(ultimoRegistro.NDVI_index          || 0),
       });
 
-      // Cachea el último registro como respaldo
       localStorage.setItem('agro_last_record', JSON.stringify(ultimoRegistro));
       return true;
     };
 
     const consultarDatos = async () => {
-      // Solo consulta si hay usuario logueado
-      if (!usuario) return;
-
       try {
-        const response = await fetch('https://agrosmart-api-940420015515.us-central1.run.app/datos-dashboard');
-        const datos = await response.json();
+        // Pasamos la hectarea seleccionada al endpoint (null = todas)
+        const { data: datos } = await getDashboard({ hectarea: hectareaSeleccionada });
 
         if (Array.isArray(datos) && datos.length > 0) {
           aplicarRegistros(datos);
           setOrigenDatos("api");
         } else {
-          setOrigenDatos("vacío");
+          // Sin datos para esta zona: limpiamos las parcelas para que el dashboard
+          // muestre el estado vacio correctamente
+          setParcelas([]);
+          setHistorialGrafico([]);
+          setOrigenDatos("vacio");
         }
       } catch {
-        // Si la API falla, intenta cargar desde cache
-        const cache = localStorage.getItem('agro_last_record');
-        if (cache) {
-          try {
-            const registroCache = JSON.parse(cache);
-            aplicarRegistros([registroCache]);
-            setOrigenDatos("cache");
-          } catch {
+        // Si la API falla, intentamos el cache (solo si no hay filtro activo)
+        if (!hectareaSeleccionada) {
+          const cache = localStorage.getItem('agro_last_record');
+          if (cache) {
+            try {
+              aplicarRegistros([JSON.parse(cache)]);
+              setOrigenDatos("cache");
+            } catch {
+              setOrigenDatos("error");
+            }
+          } else {
             setOrigenDatos("error");
           }
         } else {
@@ -108,13 +134,11 @@ function App() {
     };
 
     consultarDatos();
-  }, [usuario]);
+  }, [usuario, hectareaSeleccionada]); // <-- re-fetch al cambiar hectarea
 
   const mostrarNotificacion = (mensaje, tipo = 'success') => {
     setNotificacion({ mostrar: true, mensaje, tipo });
-    setTimeout(() => {
-      setNotificacion({ mostrar: false, mensaje: '', tipo: '' });
-    }, 4000);
+    setTimeout(() => setNotificacion({ mostrar: false, mensaje: '', tipo: '' }), 4000);
   };
 
   const manejarAprobacionAlerta = async (registroEspecifico) => {
@@ -123,25 +147,23 @@ function App() {
 
       const payload = {
         telefono: "+51906967430",
-        riesgo: registroEspecifico.crop_disease_status || riesgo,
-        fertilizante: fertilizante,
-        farm_id: registroEspecifico.farm_id || "FARM_001",
-        cultivo: registroEspecifico.crop_type || "Maíz",
-        ndvi: (registroEspecifico.NDVI_index || datosSensores.ndvi).toString(),
-        humedad: (registroEspecifico['humidity_%'] || datosSensores.hum).toString(),
-        accion: fertilizante
+        riesgo:     registroEspecifico.crop_disease_status || riesgo,
+        fertilizante,
+        farm_id:  registroEspecifico.farm_id  || "FARM_001",
+        cultivo:  registroEspecifico.crop_type || "Maiz",
+        ndvi:     (registroEspecifico.NDVI_index     || datosSensores.ndvi).toString(),
+        humedad:  (registroEspecifico['humidity_%']  || datosSensores.hum).toString(),
+        accion:   fertilizante,
       };
 
-      const response = await fetch('https://agrosmart-api-940420015515.us-central1.run.app/enviar-alerta-wa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
+      const response = await fetch(
+        'https://agrosmart-api-940420015515.us-central1.run.app/enviar-alerta-wa',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+      );
       const resultado = await response.json();
 
       if (resultado.status === "success") {
-        mostrarNotificacion(`¡Alerta enviada correctamente al agricultor del ${registroEspecifico.farm_id}!`);
+        mostrarNotificacion(`Alerta enviada al agricultor del ${registroEspecifico.farm_id}.`);
 
         const idUnico = Date.now();
         const nuevaAlerta = {
@@ -150,18 +172,14 @@ function App() {
           lote: registroEspecifico.farm_id || "Lote Desconocido",
           diagnostico: registroEspecifico.crop_disease_status || riesgo,
           recomendacion: fertilizante,
-          estado: 'PENDING'
+          estado: 'PENDING',
         };
-
         setHistorialAlertas(prev => [nuevaAlerta, ...prev]);
 
-        // Auto-timeout después de 60 segundos si no hay confirmación
         setTimeout(() => {
-          setHistorialAlertas(historialActual =>
-            historialActual.map(alerta =>
-              (alerta.id === idUnico && alerta.estado === 'PENDING')
-                ? { ...alerta, estado: 'TIMEOUT' }
-                : alerta
+          setHistorialAlertas(actual =>
+            actual.map(a =>
+              a.id === idUnico && a.estado === 'PENDING' ? { ...a, estado: 'TIMEOUT' } : a
             )
           );
         }, 60000);
@@ -171,23 +189,25 @@ function App() {
       }
     } catch (error) {
       console.error("Error enviando alerta:", error);
-      mostrarNotificacion("Error de conexión", "error");
+      mostrarNotificacion("Error de conexion", "error");
     }
   };
 
   const confirmarAlerta = (id) => {
     setHistorialAlertas(prev =>
-      prev.map(alerta => alerta.id === id ? { ...alerta, estado: 'SUCCESS' } : alerta)
+      prev.map(a => a.id === id ? { ...a, estado: 'SUCCESS' } : a)
     );
   };
 
   const contextValue = {
-    riesgo, setRiesgo, fertilizante, setFertilizante, datosSensores, setDatosSensores,
-    historialGrafico, setHistorialGrafico, parcelas, setParcelas, origenDatos, setOrigenDatos,
-    historialAlertas, setHistorialAlertas, manejarAprobacionAlerta, confirmarAlerta
+    riesgo, setRiesgo, fertilizante, setFertilizante,
+    datosSensores, setDatosSensores,
+    historialGrafico, setHistorialGrafico,
+    parcelas, setParcelas,
+    origenDatos, setOrigenDatos,
+    historialAlertas, setHistorialAlertas,
+    manejarAprobacionAlerta, confirmarAlerta,
   };
-
-  // === RENDERIZADO CONDICIONAL DE SEGURIDAD ===
 
   if (cargandoAuth) {
     return (
@@ -199,25 +219,37 @@ function App() {
     );
   }
 
-  if (!usuario) {
-    return <Login />;
-  }
+  if (!usuario) return <Login />;
 
   return (
     <Router>
       <AppContext.Provider value={contextValue}>
         {notificacion.mostrar && (
           <div className="fixed bottom-10 right-10 z-[9999] transition-all duration-500 ease-in-out">
-            <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 text-white font-medium ${notificacion.tipo === 'success' ? 'bg-[#25D366]' : 'bg-red-500'}`}>
-              {notificacion.tipo === 'success' ? <CheckCircle size={24} /> : <AlertTriangle size={24} />}
-              <span className="text-sm shadow-sm">{notificacion.mensaje}</span>
+            <div className={`px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 text-white font-medium
+              ${notificacion.tipo === 'success' ? 'bg-[#25D366]' : 'bg-red-500'}`}>
+              {notificacion.tipo === 'success'
+                ? <CheckCircle size={24} />
+                : <AlertTriangle size={24} />}
+              <span className="text-sm">{notificacion.mensaje}</span>
             </div>
           </div>
         )}
 
         <Routes>
           <Route path="/" element={<MainLayout origenDatos={origenDatos} />}>
-            <Route index element={<Overview parcelas={parcelas} manejarAprobacionAlerta={manejarAprobacionAlerta} />} />
+            <Route
+              index
+              element={
+                <Overview
+                  parcelas={parcelas}
+                  manejarAprobacionAlerta={manejarAprobacionAlerta}
+                  zonas={zonas}
+                  hectareaSeleccionada={hectareaSeleccionada}
+                  setHectareaSeleccionada={setHectareaSeleccionada}
+                />
+              }
+            />
             <Route path="guardian" element={<Guardian riesgo={riesgo} fertilizante={fertilizante} datosSensores={datosSensores} />} />
             <Route path="alertas" element={<Alerts historialAlertas={historialAlertas} manejarAprobacionAlerta={manejarAprobacionAlerta} confirmarAlerta={confirmarAlerta} />} />
             <Route path="record" element={<Record historialAlertas={historialAlertas} />} />
