@@ -4,14 +4,16 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import Record from './views/record.jsx';
 
-// FIREBASE 
+// FIREBASE
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import Login from './views/login.jsx';
 
 import Overview from './views/overview.jsx';
+import Analitica from './views/analitica.jsx';
 import Guardian from './views/guardian.jsx';
 import Alerts from './views/alerts.jsx';
+import Simulador from './views/simulador.jsx';
 
 import MainLayout from './layouts/MainLayout';
 import AppContext from './context/AppContext';
@@ -250,9 +252,11 @@ function App() {
                 />
               }
             />
+            <Route path="analitica" element={<Analitica parcelas={parcelas} zonas={zonas} hectareaSeleccionada={hectareaSeleccionada} setHectareaSeleccionada={setHectareaSeleccionada} />} />
             <Route path="guardian" element={<Guardian riesgo={riesgo} fertilizante={fertilizante} datosSensores={datosSensores} />} />
             <Route path="alertas" element={<Alerts historialAlertas={historialAlertas} manejarAprobacionAlerta={manejarAprobacionAlerta} confirmarAlerta={confirmarAlerta} />} />
             <Route path="record" element={<Record historialAlertas={historialAlertas} />} />
+            <Route path="simulador" element={<Simulador />} />
             <Route path="*" element={<div className="p-10 text-center"><h2 className="text-3xl font-bold text-red-500 mb-4">Ruta no encontrada</h2></div>} />
           </Route>
         </Routes>

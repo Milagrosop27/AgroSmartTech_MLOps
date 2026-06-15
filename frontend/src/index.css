@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+@theme {
+  --color-agro-50: #f6fbf1;
+  --color-agro-100: #eaf6df;
+  --color-agro-200: #d2ebbd;
+  --color-agro-300: #badd7f;
+  --color-agro-400: #a3cd5e;
+  --color-agro-500: #87ad41;
+  --color-agro-600: #68882e;
+  --color-agro-700: #4f6825;
+  --color-agro-800: #415421;
+  --color-agro-900: #384620;
+  --color-agro-10: #d7e3a4;
+  --color-agro-avocado: #DCF4A2;
+  --color-: #FAFAFA;
+}
