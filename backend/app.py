@@ -3,7 +3,6 @@ import pandas as pd
 from pathlib import Path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from collections import deque
 from backend.services.whatsapp_service import enviar_alerta_twilio
 from twilio.twiml.messaging_response import MessagingResponse
 import logging
@@ -443,6 +442,34 @@ def obtener_confirmaciones():
     confirmaciones_whatsapp.clear()
     return jsonify({"confirmadas": copia_confirmadas}), 200
 
+@app.route('/api/agricultores', methods=['GET'])
+def obtener_agricultores():
+    try:
+        client = obtener_bq_client()
+        if client is None:
+            return jsonify([]), 500
+
+        query = """
+            SELECT telefono, nombre, fecha_registro
+            FROM `agrosmart-tech-mlops.agrosmart_dataset.agricultores`
+            ORDER BY fecha_registro DESC
+        """
+        results = client.query(query).result()
+
+        agricultores = []
+        for row in results:
+            agricultores.append({
+                "telefono": row.telefono,
+                "nombre": row.nombre,
+                "fecha_registro": row.fecha_registro.isoformat() if row.fecha_registro else None
+            })
+
+        logging.info(f"/api/agricultores: {len(agricultores)} registrados.")
+        return jsonify(agricultores), 200
+
+    except Exception as e:
+        logging.error(f"Error en /api/agricultores: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

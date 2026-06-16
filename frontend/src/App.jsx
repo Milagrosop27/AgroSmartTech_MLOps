@@ -20,11 +20,8 @@ import AppContext from './context/AppContext';
 import { getDashboard, getZonas } from './services/api';
 
 function App() {
-  // === AUTENTICACION ===
   const [usuario, setUsuario] = useState(null);
   const [cargandoAuth, setCargandoAuth] = useState(true);
-
-  // === ESTADO DE AGROSMART ===
   const [riesgo, setRiesgo] = useState("Esperando...");
   const [fertilizante, setFertilizante] = useState("Esperando...");
   const [notificacion, setNotificacion] = useState({ mostrar: false, mensaje: '', tipo: '' });
@@ -38,14 +35,9 @@ function App() {
   const [historialGrafico, setHistorialGrafico] = useState([]);
   const [parcelas, setParcelas] = useState([]);
   const [origenDatos, setOrigenDatos] = useState("cargando");
-
-  // === ESTADO DE SELECCION DE ZONA (FASE 3) ===
-  // hectareaSeleccionada: null = todas | "H1" = filtrado
   const [hectareaSeleccionada, setHectareaSeleccionada] = useState(null);
-  // zonas: catalogo completo devuelto por /api/zonas
   const [zonas, setZonas] = useState({ hectareas: [], sectores_por_hectarea: {} });
 
-  // === OBSERVADOR DE SESION FIREBASE ===
   useEffect(() => {
     const desubscribir = onAuthStateChanged(auth, (user) => {
       setUsuario(user);
@@ -54,20 +46,16 @@ function App() {
     return () => desubscribir();
   }, []);
 
-  // === PERSISTENCIA DE ALERTAS ===
   useEffect(() => {
     localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
   }, [historialAlertas]);
 
-  // === CARGA DE CATALOGO DE ZONAS (una sola vez al iniciar sesion) ===
   useEffect(() => {
     if (!usuario) return;
     const cargarZonas = async () => {
       try {
         const { data } = await getZonas();
-        if (data?.hectareas?.length > 0) {
-          setZonas(data);
-        }
+        if (data?.hectareas?.length > 0) setZonas(data);
       } catch (err) {
         console.warn("No se pudo cargar el catalogo de zonas:", err);
       }
@@ -75,48 +63,38 @@ function App() {
     cargarZonas();
   }, [usuario]);
 
-  // === CARGA DE DATOS DEL DASHBOARD ===
-  // Se re-ejecuta cuando cambia el usuario o la hectarea seleccionada
   useEffect(() => {
     if (!usuario) return;
 
     const aplicarRegistros = (registros) => {
       if (!Array.isArray(registros) || registros.length === 0) return false;
-
       setParcelas(registros);
       setHistorialGrafico(registros);
-
       const ultimoRegistro = registros[registros.length - 1];
       setRiesgo(ultimoRegistro.crop_disease_status || ultimoRegistro.diagnostico || "Sin diagnostico");
       setFertilizante(ultimoRegistro.recomendacion || "Sin sugerencia");
       setDatosSensores({
-        temp:  Number(ultimoRegistro.temperature_C       || 0),
-        hum:   Number(ultimoRegistro['humidity_%']       || 0),
-        ph:    Number(ultimoRegistro.soil_pH             || 0),
-        ndvi:  Number(ultimoRegistro.NDVI_index          || 0),
+        temp:  Number(ultimoRegistro.temperature_C    || 0),
+        hum:   Number(ultimoRegistro['humidity_%']    || 0),
+        ph:    Number(ultimoRegistro.soil_pH          || 0),
+        ndvi:  Number(ultimoRegistro.NDVI_index       || 0),
       });
-
       localStorage.setItem('agro_last_record', JSON.stringify(ultimoRegistro));
       return true;
     };
 
     const consultarDatos = async () => {
       try {
-        // Pasamos la hectarea seleccionada al endpoint (null = todas)
         const { data: datos } = await getDashboard({ hectarea: hectareaSeleccionada });
-
         if (Array.isArray(datos) && datos.length > 0) {
           aplicarRegistros(datos);
           setOrigenDatos("api");
         } else {
-          // Sin datos para esta zona: limpiamos las parcelas para que el dashboard
-          // muestre el estado vacio correctamente
           setParcelas([]);
           setHistorialGrafico([]);
           setOrigenDatos("vacio");
         }
       } catch {
-        // Si la API falla, intentamos el cache (solo si no hay filtro activo)
         if (!hectareaSeleccionada) {
           const cache = localStorage.getItem('agro_last_record');
           if (cache) {
@@ -136,26 +114,27 @@ function App() {
     };
 
     consultarDatos();
-  }, [usuario, hectareaSeleccionada]); // <-- re-fetch al cambiar hectarea
+  }, [usuario, hectareaSeleccionada]);
 
   const mostrarNotificacion = (mensaje, tipo = 'success') => {
     setNotificacion({ mostrar: true, mensaje, tipo });
     setTimeout(() => setNotificacion({ mostrar: false, mensaje: '', tipo: '' }), 4000);
   };
 
-  const manejarAprobacionAlerta = async (registroEspecifico) => {
+  // ✅ CAMBIO: recibe telefonoDestino como segundo parámetro
+  const manejarAprobacionAlerta = async (registroEspecifico, telefonoDestino) => {
     try {
-      if (!registroEspecifico) return;
+      if (!registroEspecifico || !telefonoDestino) return;
 
       const payload = {
-        telefono: "+51906967430",
-        riesgo:     registroEspecifico.crop_disease_status || riesgo,
+        telefono: telefonoDestino, // ✅ dinámico, viene del modal
+        riesgo:    registroEspecifico.crop_disease_status || riesgo,
         fertilizante,
-        farm_id:  registroEspecifico.farm_id  || "FARM_001",
-        cultivo:  registroEspecifico.crop_type || "Maiz",
-        ndvi:     (registroEspecifico.NDVI_index     || datosSensores.ndvi).toString(),
-        humedad:  (registroEspecifico['humidity_%']  || datosSensores.hum).toString(),
-        accion:   fertilizante,
+        farm_id:   registroEspecifico.farm_id   || "FARM_001",
+        cultivo:   registroEspecifico.crop_type  || "Maiz",
+        ndvi:      (registroEspecifico.NDVI_index    || datosSensores.ndvi).toString(),
+        humedad:   (registroEspecifico['humidity_%'] || datosSensores.hum).toString(),
+        accion:    fertilizante,
       };
 
       const response = await fetch(
