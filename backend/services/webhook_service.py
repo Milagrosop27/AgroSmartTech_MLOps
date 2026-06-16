@@ -36,7 +36,7 @@ def registrar_agricultor_si_nuevo(numero):
     try:
         query = f"""
             SELECT COUNT(*) as total 
-            FROM `agrosmart-tech-mlops.agrosmart_dataset.agricultores`
+            FROM `agrosmart-tech-mlops.agrosmart_data.agricultores`
             WHERE telefono = '{numero}'
         """
         resultado = client.query(query).result()
@@ -49,7 +49,7 @@ def registrar_agricultor_si_nuevo(numero):
                 "fecha_registro": datetime.utcnow().isoformat()
             }
             client.insert_rows_json(
-                "agrosmart-tech-mlops.agrosmart_dataset.agricultores",
+                "agrosmart-tech-mlops.agrosmart_data.agricultores",
                 [fila]
             )
             print(f"✅ Nuevo agricultor registrado: {numero}")
