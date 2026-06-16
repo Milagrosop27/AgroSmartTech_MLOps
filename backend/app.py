@@ -451,7 +451,7 @@ def obtener_agricultores():
 
         query = """
             SELECT telefono, nombre, fecha_registro
-            FROM `agrosmart-tech-mlops.agrosmart_dataset.agricultores`
+            FROM `agrosmart-tech-mlops.agrosmart_data.agricultores`
             ORDER BY fecha_registro DESC
         """
         results = client.query(query).result()
