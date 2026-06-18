@@ -77,7 +77,13 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
         <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-600">
           Sector: <span className="font-bold text-gray-800">{registro?.farm_id}</span>
           {' · '}
-          Riesgo: <span className="font-bold text-red-600">{registro?.crop_disease_status}</span>
+          Riesgo: <span className={`font-bold ${
+            registro?.crop_disease_status === 'Severe' ? 'text-red-600' :
+            registro?.crop_disease_status === 'Moderate' ? 'text-amber-500' :
+            'text-yellow-500'
+          }`}>
+            {traducirRiesgo(registro?.crop_disease_status)}
+          </span>
         </div>
 
         {/* Lista agrupada por área */}
