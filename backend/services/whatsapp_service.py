@@ -13,6 +13,13 @@ def enviar_alerta_twilio(telefono_destino, riesgo, farm_id, cultivo, ndvi, humed
     numero_limpio = telefono_destino.strip().lstrip('+')
     destino_formateado = f"whatsapp:+{numero_limpio}"
 
+    traduccion_riesgo = {
+        'Severe': 'Crítico',
+        'Moderate': 'Moderado',
+        'Mild': 'Leve'
+    }
+    riesgo_es = traduccion_riesgo.get(riesgo, riesgo)
+
     # Aquí construimos el mensaje con el formato exacto que querías
     mensaje = (
         f"🚨 *ALERTA AGROSMART* 🚨\n"

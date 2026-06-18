@@ -1,4 +1,3 @@
-// src/App.jsx
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
@@ -189,6 +188,7 @@ function App() {
           diagnostico: registroEspecifico.crop_disease_status || riesgo,
           recomendacion: fertilizante,
           estado: 'PENDING',
+          telefono: telefonoDestino, // ✅ guardamos el teléfono para reenvío
         };
         setHistorialAlertas(prev => [nuevaAlerta, ...prev]);
 

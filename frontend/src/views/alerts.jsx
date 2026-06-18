@@ -66,7 +66,14 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                     {/* ESTADO 2: TIMEOUT (EL DISEÑO DE TU CAPTURA) */}
                     {alerta.estado === 'TIMEOUT' && (
                       <button
-                        onClick={() => manejarAprobacionAlerta({ farm_id: alerta.lote, crop_disease_status: alerta.diagnostico })}
+                        onClick={() => manejarAprobacionAlerta(
+                          {
+                            farm_id: alerta.lote,
+                            crop_disease_status: alerta.diagnostico,
+                            crop_type: alerta.cultivo
+                          },
+                          alerta.telefono  // ✅ usa el teléfono guardado
+                        )}
                         className="flex items-center gap-1 text-green-600 bg-green-50 border border-green-200 hover:bg-green-100 px-3 py-1 rounded-md text-sm font-semibold transition-colors"
                       >
                         <Send size={14} />

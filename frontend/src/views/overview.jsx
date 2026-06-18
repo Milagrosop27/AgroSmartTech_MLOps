@@ -34,6 +34,15 @@ const getLabelEstado = (estado) => {
   }
 };
 
+const traducirRiesgo = (diagnostico) => {
+  switch (diagnostico) {
+    case 'Severe':   return 'Crítico';
+    case 'Moderate': return 'Moderado';
+    case 'Mild':     return 'Leve';
+    default:         return diagnostico || '';
+  }
+};
+
 // --- MODAL SELECTOR DE AGRICULTOR ---
 const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
   const [agricultores, setAgricultores] = useState([]);
