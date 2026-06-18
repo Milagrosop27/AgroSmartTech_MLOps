@@ -51,6 +51,16 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
       .catch(() => setCargando(false));
   }, []);
 
+  // Agrupar agricultores por área
+  const agricultoresPorArea = agricultores.reduce((acc, a) => {
+    const area = a.area || 'Sin área';
+    if (!acc[area]) acc[area] = [];
+    acc[area].push(a);
+    return acc;
+  }, {});
+
+  const areasOrdenadas = Object.keys(agricultoresPorArea).sort();
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
@@ -70,7 +80,7 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
           Riesgo: <span className="font-bold text-red-600">{registro?.crop_disease_status}</span>
         </div>
 
-        {/* Lista de agricultores */}
+        {/* Lista agrupada por área */}
         <p className="text-sm font-semibold text-gray-500 mb-2">Seleccionar agricultor:</p>
 
         {cargando ? (
@@ -85,32 +95,50 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
             </p>
           </div>
         ) : (
-          <div className="space-y-2 max-h-48 overflow-y-auto mb-4">
-            {agricultores.map((a) => (
-              <button
-                key={a.telefono}
-                onClick={() => setSeleccionado(a)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
-                  seleccionado?.telefono === a.telefono
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-200 hover:border-green-300'
-                }`}
-              >
-                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                  <User size={16} className="text-green-700" />
+          <div className="space-y-3 max-h-56 overflow-y-auto mb-4">
+            {areasOrdenadas.map((area) => (
+              <div key={area}>
+                {/* Encabezado de área */}
+                <div className="flex items-center gap-2 mb-1.5">
+                  <MapPin size={12} className="text-green-600" />
+                  <span className="text-xs font-bold text-green-700 uppercase tracking-wider">
+                    {area}
+                  </span>
+                  <div className="flex-1 h-px bg-green-100" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{a.nombre}</p>
-                  <p className="text-xs text-gray-400">{a.telefono}</p>
+
+                {/* Agricultores del área */}
+                <div className="space-y-1.5 pl-1">
+                  {agricultoresPorArea[area].map((a) => (
+                    <button
+                      key={a.telefono}
+                      onClick={() => setSeleccionado(a)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                        seleccionado?.telefono === a.telefono
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-200 hover:border-green-300'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <User size={16} className="text-green-700" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">
+                          {a.nombre} {a.apellidos || ''}
+                        </p>
+                        <p className="text-xs text-gray-400">{a.telefono}</p>
+                      </div>
+                      {seleccionado?.telefono === a.telefono && (
+                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M1.5 5l2.5 2.5 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                  ))}
                 </div>
-                {seleccionado?.telefono === a.telefono && (
-                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                      <path d="M1.5 5l2.5 2.5 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                )}
-              </button>
+              </div>
             ))}
           </div>
         )}

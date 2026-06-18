@@ -1,5 +1,23 @@
 import { CheckCircle, Send, Clock } from 'lucide-react';
 
+const traducirRiesgo = (diagnostico) => {
+  switch (diagnostico) {
+    case 'Severe':   return 'Crítico';
+    case 'Moderate': return 'Moderado';
+    case 'Mild':     return 'Leve';
+    default:         return diagnostico;
+  }
+};
+
+const getBadgeRiesgo = (diagnostico) => {
+  switch (diagnostico) {
+    case 'Severe':   return 'bg-red-50 text-red-600';
+    case 'Moderate': return 'bg-amber-50 text-amber-600';
+    case 'Mild':     return 'bg-yellow-50 text-yellow-600';
+    default:         return 'bg-gray-50 text-gray-600';
+  }
+};
+
 const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) => {
   return (
     <div className="p-8 bg-gray-50 min-h-screen">
@@ -31,12 +49,8 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                   <td className="px-6 py-4 whitespace-nowrap">{alerta.fecha}</td>
                   <td className="px-6 py-4 font-medium text-gray-800">{alerta.lote}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${
-                      alerta.diagnostico === 'Severe' || alerta.diagnostico === 'Riesgo Crítico' 
-                        ? 'bg-red-50 text-red-600' 
-                        : 'bg-amber-50 text-amber-600'
-                    }`}>
-                      {alerta.diagnostico}
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${getBadgeRiesgo(alerta.diagnostico)}`}>
+                      {traducirRiesgo(alerta.diagnostico)}
                     </span>
                   </td>
                   <td className="px-6 py-4">{alerta.recomendacion}</td>

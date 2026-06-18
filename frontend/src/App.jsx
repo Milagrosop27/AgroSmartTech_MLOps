@@ -116,18 +116,53 @@ function App() {
     consultarDatos();
   }, [usuario, hectareaSeleccionada]);
 
+  // === POLLING DE CONFIRMACIONES WHATSAPP ===
+  useEffect(() => {
+    if (!usuario) return;
+
+    const intervalo = setInterval(async () => {
+      const hayPendientes = historialAlertas.some(a => a.estado === 'PENDING');
+      if (!hayPendientes) return;
+
+      try {
+        const response = await fetch(
+          'https://agrosmart-api-940420015515.us-central1.run.app/api/confirmaciones'
+        );
+        const data = await response.json();
+
+        if (data.confirmadas && data.confirmadas.length > 0) {
+          setHistorialAlertas(actual =>
+            actual.map((alerta, index) => {
+              if (
+                alerta.estado === 'PENDING' &&
+                index === actual.findIndex(a => a.estado === 'PENDING')
+              ) {
+                return { ...alerta, estado: 'SUCCESS' };
+              }
+              return alerta;
+            })
+          );
+          mostrarNotificacion('✅ Acción confirmada por el agricultor.');
+        }
+      } catch (error) {
+        console.error('Error en polling de confirmaciones:', error);
+      }
+    }, 5000);
+
+    return () => clearInterval(intervalo);
+  }, [usuario, historialAlertas]);
+
   const mostrarNotificacion = (mensaje, tipo = 'success') => {
     setNotificacion({ mostrar: true, mensaje, tipo });
     setTimeout(() => setNotificacion({ mostrar: false, mensaje: '', tipo: '' }), 4000);
   };
 
-  // ✅ CAMBIO: recibe telefonoDestino como segundo parámetro
   const manejarAprobacionAlerta = async (registroEspecifico, telefonoDestino) => {
     try {
       if (!registroEspecifico || !telefonoDestino) return;
 
       const payload = {
-        telefono: telefonoDestino, // ✅ dinámico, viene del modal
+        telefono: telefonoDestino,
         riesgo:    registroEspecifico.crop_disease_status || riesgo,
         fertilizante,
         farm_id:   registroEspecifico.farm_id   || "FARM_001",

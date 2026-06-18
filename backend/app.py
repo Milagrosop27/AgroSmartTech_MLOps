@@ -421,13 +421,16 @@ def recibir_eventos_whatsapp():
         from backend.services.webhook_service import procesar_mensaje_entrante
 
         resultado = procesar_mensaje_entrante(data)
+        resp = MessagingResponse()
 
         if resultado.get("status") == "confirmado":
             telefono = resultado.get("telefono")
             confirmaciones_whatsapp.append(telefono)
             logging.info(f"Accion confirmada por el usuario {telefono}.")
 
-        resp = MessagingResponse()
+        elif resultado.get("respuesta"):
+            resp.message(resultado["respuesta"])
+
         return str(resp), 200
 
     except Exception as e:
@@ -450,9 +453,9 @@ def obtener_agricultores():
             return jsonify([]), 500
 
         query = """
-            SELECT telefono, nombre, fecha_registro
+            SELECT telefono, nombre, apellidos, area, fecha_registro
             FROM `agrosmart-tech-mlops.agrosmart_data.agricultores`
-            ORDER BY fecha_registro DESC
+            ORDER BY area ASC, fecha_registro ASC
         """
         results = client.query(query).result()
 
@@ -461,6 +464,8 @@ def obtener_agricultores():
             agricultores.append({
                 "telefono": row.telefono,
                 "nombre": row.nombre,
+                "apellidos": row.apellidos or '',
+                "area": row.area or 'Sin área',
                 "fecha_registro": row.fecha_registro.isoformat() if row.fecha_registro else None
             })
 
@@ -470,7 +475,6 @@ def obtener_agricultores():
     except Exception as e:
         logging.error(f"Error en /api/agricultores: {e}")
         return jsonify({"error": str(e)}), 500
-
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
