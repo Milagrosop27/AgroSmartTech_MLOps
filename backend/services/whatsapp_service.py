@@ -24,7 +24,7 @@ def enviar_alerta_twilio(telefono_destino, riesgo, farm_id, cultivo, ndvi, humed
     mensaje = (
         f"🚨 *ALERTA AGROSMART* 🚨\n"
         f"Se ha detectado un cambio en las condiciones del campo.\n\n"
-        f"- *Nivel de Riesgo:* {riesgo}\n"
+        f"- *Nivel de Riesgo:* {riesgo_es}\n"
         f"- *Finca:* {farm_id}\n"
         f"- *Cultivo:* {cultivo}\n"
         f"- *Índice NDVI:* {ndvi}\n"
