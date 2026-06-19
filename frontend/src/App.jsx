@@ -27,7 +27,14 @@ function App() {
 
   const [historialAlertas, setHistorialAlertas] = useState(() => {
     const guardado = localStorage.getItem('agro_history_v1');
-    return guardado ? JSON.parse(guardado) : [];
+    if (!guardado) return [];
+    const datos = JSON.parse(guardado);
+    const idsVistos = new Set();
+    return datos.filter(alerta => {
+      if (idsVistos.has(alerta.id)) return false;
+      idsVistos.add(alerta.id);
+      return true;
+    });
   });
 
   const [datosSensores, setDatosSensores] = useState({ temp: 0, hum: 0, ph: 0, ndvi: 0 });

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { CheckCircle, Send, Clock, Filter, X } from 'lucide-react';
+import { CheckCircle, Send, Clock, Filter, X, Calendar } from 'lucide-react';
 
 const traducirRiesgo = (diagnostico) => {
   switch (diagnostico) {
@@ -19,61 +19,147 @@ const getBadgeRiesgo = (diagnostico) => {
   }
 };
 
+// --- MINI CALENDARIO ---
+const MiniCalendario = ({ fechaSeleccionada, onSeleccionar, onCerrar }) => {
+  const hoy = new Date();
+  const [mesVista, setMesVista] = useState(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+
+  const diasEnMes = new Date(mesVista.getFullYear(), mesVista.getMonth() + 1, 0).getDate();
+  const primerDia = new Date(mesVista.getFullYear(), mesVista.getMonth(), 1).getDay();
+
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const diasSemana = ['Do','Lu','Ma','Mi','Ju','Vi','Sá'];
+
+  const mesAnterior = () => setMesVista(new Date(mesVista.getFullYear(), mesVista.getMonth() - 1, 1));
+  const mesSiguiente = () => setMesVista(new Date(mesVista.getFullYear(), mesVista.getMonth() + 1, 1));
+
+  const formatoFecha = (d) => {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const celdas = [];
+  for (let i = 0; i < primerDia; i++) celdas.push(null);
+  for (let d = 1; d <= diasEnMes; d++) celdas.push(d);
+
+  return (
+    <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 w-72">
+      {/* Navegación mes */}
+      <div className="flex justify-between items-center mb-3">
+        <button onClick={mesAnterior} className="p-1 rounded-lg hover:bg-gray-100 text-gray-600 font-bold">‹</button>
+        <span className="text-sm font-bold text-gray-800">
+          {meses[mesVista.getMonth()]} {mesVista.getFullYear()}
+        </span>
+        <button onClick={mesSiguiente} className="p-1 rounded-lg hover:bg-gray-100 text-gray-600 font-bold">›</button>
+      </div>
+
+      {/* Días de la semana */}
+      <div className="grid grid-cols-7 mb-1">
+        {diasSemana.map(d => (
+          <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Días del mes */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {celdas.map((dia, i) => {
+          if (!dia) return <div key={`empty-${i}`} />;
+          const fechaStr = formatoFecha(new Date(mesVista.getFullYear(), mesVista.getMonth(), dia));
+          const esSeleccionado = fechaSeleccionada === fechaStr;
+          const esHoy = formatoFecha(hoy) === fechaStr;
+          return (
+            <button
+              key={dia}
+              onClick={() => { onSeleccionar(fechaStr); onCerrar(); }}
+              className={`text-xs rounded-lg py-1.5 font-medium transition-colors ${
+                esSeleccionado
+                  ? 'bg-green-600 text-white'
+                  : esHoy
+                  ? 'bg-green-50 text-green-700 font-bold'
+                  : 'hover:bg-gray-100 text-gray-700'
+              }`}
+            >
+              {dia}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Botón limpiar */}
+      {fechaSeleccionada && (
+        <button
+          onClick={() => { onSeleccionar(null); onCerrar(); }}
+          className="mt-3 w-full text-xs text-gray-400 hover:text-red-500 transition-colors text-center"
+        >
+          Limpiar fecha exacta
+        </button>
+      )}
+    </div>
+  );
+};
+
 const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) => {
   const [filtroFecha, setFiltroFecha] = useState('todos');
+  const [fechaExacta, setFechaExacta] = useState(null);
+  const [mostrarCalendario, setMostrarCalendario] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroLote, setFiltroLote] = useState('todos');
   const [filtroDiagnostico, setFiltroDiagnostico] = useState('todos');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
-  // Opciones dinámicas de lotes
-  const lotesUnicos = useMemo(() => {
-    const lotes = [...new Set(historialAlertas.map(a => a.lote))].filter(Boolean).sort();
-    return lotes;
-  }, [historialAlertas]);
+  const hectareasUnicas = useMemo(() => {
+  const hectareas = historialAlertas
+    .map(a => a.lote?.split('_')[0])
+    .filter(Boolean);
+  return [...new Set(hectareas)].sort();
+}, [historialAlertas]);
 
-  // Filtrado
   const alertasFiltradas = useMemo(() => {
     const ahora = new Date();
 
     return historialAlertas.filter(alerta => {
-      // Filtro fecha
-      if (filtroFecha !== 'todos') {
-        const fechaAlerta = new Date(alerta.fecha);
+      const fechaAlerta = new Date(alerta.fecha);
+
+      // Fecha exacta tiene prioridad sobre pill
+      if (fechaExacta) {
+        if (isNaN(fechaAlerta.getTime())) return false;
+        const fechaStr = fechaAlerta.toISOString().split('T')[0];
+        if (fechaStr !== fechaExacta) return false;
+      } else if (filtroFecha !== 'todos') {
         if (filtroFecha === 'hoy') {
-          const esHoy = fechaAlerta.toDateString() === ahora.toDateString();
-          if (!esHoy) return false;
+          if (fechaAlerta.toDateString() !== ahora.toDateString()) return false;
         } else if (filtroFecha === 'semana') {
-          const hace7dias = new Date(ahora);
-          hace7dias.setDate(ahora.getDate() - 7);
-          if (fechaAlerta < hace7dias) return false;
+          const hace7 = new Date(ahora); hace7.setDate(ahora.getDate() - 7);
+          if (fechaAlerta < hace7) return false;
         } else if (filtroFecha === 'mes') {
-          const hace30dias = new Date(ahora);
-          hace30dias.setDate(ahora.getDate() - 30);
-          if (fechaAlerta < hace30dias) return false;
+          const hace30 = new Date(ahora); hace30.setDate(ahora.getDate() - 30);
+          if (fechaAlerta < hace30) return false;
         }
       }
 
-      // Filtro estado
       if (filtroEstado !== 'todos' && alerta.estado !== filtroEstado) return false;
-
-      // Filtro lote
-      if (filtroLote !== 'todos' && alerta.lote !== filtroLote) return false;
-
-      // Filtro diagnóstico
+      if (filtroLote !== 'todos' && !alerta.lote?.startsWith(filtroLote)) return false;
       if (filtroDiagnostico !== 'todos' && alerta.diagnostico !== filtroDiagnostico) return false;
 
       return true;
     });
-  }, [historialAlertas, filtroFecha, filtroEstado, filtroLote, filtroDiagnostico]);
+  }, [historialAlertas, filtroFecha, fechaExacta, filtroEstado, filtroLote, filtroDiagnostico]);
 
-  const hayFiltrosActivos = filtroFecha !== 'todos' || filtroEstado !== 'todos' || filtroLote !== 'todos' || filtroDiagnostico !== 'todos';
+  const hayFiltrosActivos = filtroFecha !== 'todos' || fechaExacta || filtroEstado !== 'todos' || filtroLote !== 'todos' || filtroDiagnostico !== 'todos';
 
   const limpiarFiltros = () => {
     setFiltroFecha('todos');
+    setFechaExacta(null);
     setFiltroEstado('todos');
     setFiltroLote('todos');
     setFiltroDiagnostico('todos');
+  };
+
+  const seleccionarPill = (valor) => {
+    setFiltroFecha(valor);
+    setFechaExacta(null); // limpiar fecha exacta al usar pill
   };
 
   return (
@@ -111,81 +197,108 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
               }`}
             >
               <Filter size={14} />
-              Filtros {hayFiltrosActivos && `(${[filtroFecha, filtroEstado, filtroLote, filtroDiagnostico].filter(f => f !== 'todos').length})`}
+              Filtros {hayFiltrosActivos && `(${[filtroFecha !== 'todos', fechaExacta, filtroEstado !== 'todos', filtroLote !== 'todos', filtroDiagnostico !== 'todos'].filter(Boolean).length})`}
             </button>
           </div>
         </div>
 
         {/* Panel de filtros */}
         {mostrarFiltros && (
-          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 space-y-4">
 
-            {/* Filtro fecha */}
+            {/* Filtro fecha — pills + calendario */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
                 Fecha
               </label>
-              <select
-                value={filtroFecha}
-                onChange={e => setFiltroFecha(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
-              >
-                <option value="todos">Todas</option>
-                <option value="hoy">Hoy</option>
-                <option value="semana">Esta semana</option>
-                <option value="mes">Este mes</option>
-              </select>
-            </div>
-
-            {/* Filtro estado */}
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
-                Estado
-              </label>
-              <select
-                value={filtroEstado}
-                onChange={e => setFiltroEstado(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
-              >
-                <option value="todos">Todos</option>
-                <option value="PENDING">Esperando</option>
-                <option value="SUCCESS">Realizado</option>
-                <option value="TIMEOUT">Timeout</option>
-              </select>
-            </div>
-
-            {/* Filtro lote */}
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
-                Lote
-              </label>
-              <select
-                value={filtroLote}
-                onChange={e => setFiltroLote(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
-              >
-                <option value="todos">Todos</option>
-                {lotesUnicos.map(lote => (
-                  <option key={lote} value={lote}>{lote}</option>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Pills rápidos */}
+                {[
+                  { label: 'Todas', valor: 'todos' },
+                  { label: 'Hoy', valor: 'hoy' },
+                  { label: 'Esta semana', valor: 'semana' },
+                  { label: 'Este mes', valor: 'mes' },
+                ].map(({ label, valor }) => (
+                  <button
+                    key={valor}
+                    onClick={() => seleccionarPill(valor)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                      filtroFecha === valor && !fechaExacta
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-green-400 hover:text-green-600'
+                    }`}
+                  >
+                    {label}
+                  </button>
                 ))}
-              </select>
+
+                {/* Botón calendario */}
+                <div className="relative">
+                  <button
+                    onClick={() => setMostrarCalendario(!mostrarCalendario)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                      fechaExacta
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-green-400 hover:text-green-600'
+                    }`}
+                  >
+                    <Calendar size={12} />
+                    {fechaExacta ? fechaExacta : 'Fecha exacta'}
+                  </button>
+
+                  {mostrarCalendario && (
+                    <MiniCalendario
+                      fechaSeleccionada={fechaExacta}
+                      onSeleccionar={(f) => { setFechaExacta(f); if (f) setFiltroFecha('todos'); }}
+                      onCerrar={() => setMostrarCalendario(false)}
+                    />
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Filtro diagnóstico */}
-            <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
-                Diagnóstico
-              </label>
-              <select
-                value={filtroDiagnostico}
-                onChange={e => setFiltroDiagnostico(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
-              >
-                <option value="todos">Todos</option>
-                <option value="Severe">Crítico</option>
-                <option value="Moderate">Moderado</option>
-                <option value="Mild">Leve</option>
-              </select>
+            {/* Filtros estado, lote, diagnóstico */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Estado</label>
+                <select
+                  value={filtroEstado}
+                  onChange={e => setFiltroEstado(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="SUCCESS">Realizado</option>
+                  <option value="TIMEOUT">Sin respuesta</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Lote</label>
+                <select
+                  value={filtroLote}
+                  onChange={e => setFiltroLote(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
+                >
+                  <option value="todos">Todos</option>
+                  {hectareasUnicas.map(h => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Diagnóstico</label>
+                <select
+                  value={filtroDiagnostico}
+                  onChange={e => setFiltroDiagnostico(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="Severe">Crítico</option>
+                  <option value="Moderate">Moderado</option>
+                  <option value="Mild">Leve</option>
+                </select>
+              </div>
             </div>
 
           </div>
@@ -236,7 +349,7 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                           },
                           alerta.telefono
                         )}
-                        className="flex items-center gap-1 text-white bg-red-500 border border-red-500 hover:bg-red-600 px-3 py-1 rounded-md text-sm font-semibold transition-colors"
+                        className="flex items-center gap-1 text-white bg-amber-600 border border-amber-700 hover:bg-amber-700 px-3 py-1 rounded-md text-sm font-semibold transition-colors"
                       >
                         <Send size={14} />
                         Reenviar
