@@ -125,7 +125,10 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
       // Fecha exacta tiene prioridad sobre pill
       if (fechaExacta) {
         if (isNaN(fechaAlerta.getTime())) return false;
-        const fechaStr = fechaAlerta.toISOString().split('T')[0];
+        const yyyy = fechaAlerta.getFullYear();
+        const mm = String(fechaAlerta.getMonth() + 1).padStart(2, '0');
+        const dd = String(fechaAlerta.getDate()).padStart(2, '0');
+        const fechaStr = `${yyyy}-${mm}-${dd}`;
         if (fechaStr !== fechaExacta) return false;
       } else if (filtroFecha !== 'todos') {
         if (filtroFecha === 'hoy') {
