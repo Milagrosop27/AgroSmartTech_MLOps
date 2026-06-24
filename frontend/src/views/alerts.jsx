@@ -152,11 +152,16 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
         if (filtroFecha === 'hoy') {
           if (fechaAlerta.toDateString() !== ahora.toDateString()) return false;
         } else if (filtroFecha === 'semana') {
-          const hace7 = new Date(ahora); hace7.setDate(ahora.getDate() - 7);
-          if (fechaAlerta < hace7) return false;
+          const inicioSemana = new Date(ahora);
+          const diaSemana = ahora.getDay() === 0 ? 6 : ahora.getDay() - 1; // lunes = 0
+          inicioSemana.setDate(ahora.getDate() - diaSemana);
+          inicioSemana.setHours(0, 0, 0, 0);
+          if (fechaAlerta < inicioSemana) return false;
         } else if (filtroFecha === 'mes') {
-          const hace30 = new Date(ahora); hace30.setDate(ahora.getDate() - 30);
-          if (fechaAlerta < hace30) return false;
+          if (
+            fechaAlerta.getMonth() !== ahora.getMonth() ||
+            fechaAlerta.getFullYear() !== ahora.getFullYear()
+          ) return false;
         }
       }
 
