@@ -121,11 +121,26 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
 
     return historialAlertas.filter(alerta => {
       // Usar fechaISO si existe, sino intentar parsear fecha
-      const fechaAlerta = alerta.fechaISO
-        ? new Date(alerta.fechaISO)
-        : new Date(alerta.fecha);
+      let fechaAlerta;
+      if (alerta.fechaISO) {
+        fechaAlerta = new Date(alerta.fechaISO);
+      } else if (alerta.fecha) {
+        // Intenta parsear "17/6/2026, 10:53:36 p.m." → "2026/6/17 10:53:36 PM"
+        const partes = String(alerta.fecha).match(
+          /(\d+)\/(\d+)\/(\d+),?\s+(\d+):(\d+):(\d+)\s*(a\.m\.|p\.m\.)/i
+        );
+        if (partes) {
+          const [, dia, mes, anio, h, min, seg, ampm] = partes;
+          let hora = parseInt(h);
+          if (ampm.toLowerCase().includes('p') && hora !== 12) hora += 12;
+          if (ampm.toLowerCase().includes('a') && hora === 12) hora = 0;
+          fechaAlerta = new Date(anio, mes - 1, dia, hora, min, seg);
+        } else {
+          fechaAlerta = new Date(alerta.fecha);
+        }
+      }
 
-      if (isNaN(fechaAlerta.getTime())) return true; // si no parsea, incluir
+      if (!fechaAlerta || isNaN(fechaAlerta.getTime())) return true;
 
       if (fechaExacta) {
         const yyyy = fechaAlerta.getFullYear();
