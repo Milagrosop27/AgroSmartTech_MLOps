@@ -120,7 +120,19 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
     const ahora = new Date();
 
     return historialAlertas.filter(alerta => {
-      const fechaAlerta = new Date(alerta.fecha);
+      // 🛠️ FIX: Corrección del Timezone de JavaScript
+      let stringFecha = String(alerta.fecha);
+
+      // Si la fecha viene como "YYYY-MM-DD", reemplazamos los guiones por barras (YYYY/MM/DD)
+      // Esto fuerza a JS a interpretarlo en la Zona Horaria Local (GMT-5) y evita que retroceda un día.
+      if (stringFecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        stringFecha = stringFecha.replace(/-/g, '/');
+      } else {
+        // Si la fecha incluye hora (Ej: "YYYY-MM-DD HH:mm:ss"), estandarizamos el espacio por 'T'
+        stringFecha = stringFecha.replace(' ', 'T');
+      }
+
+      const fechaAlerta = new Date(stringFecha);
 
       // Fecha exacta tiene prioridad sobre pill
       if (fechaExacta) {
@@ -129,6 +141,7 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
         const mm = String(fechaAlerta.getMonth() + 1).padStart(2, '0');
         const dd = String(fechaAlerta.getDate()).padStart(2, '0');
         const fechaStr = `${yyyy}-${mm}-${dd}`;
+
         if (fechaStr !== fechaExacta) return false;
       } else if (filtroFecha !== 'todos') {
         if (filtroFecha === 'hoy') {
