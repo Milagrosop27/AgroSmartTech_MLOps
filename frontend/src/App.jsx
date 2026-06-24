@@ -190,12 +190,13 @@ function App() {
         const idUnico = Date.now();
         const nuevaAlerta = {
           id: idUnico,
-          fecha: new Date().toLocaleString(),
+          fecha: new Date().toLocaleString(),       // ← para mostrar en tabla
+          fechaISO: new Date().toISOString(),       // ← para filtrar
           lote: registroEspecifico.farm_id || "Lote Desconocido",
           diagnostico: registroEspecifico.crop_disease_status || riesgo,
           recomendacion: fertilizante,
           estado: 'PENDING',
-          telefono: telefonoDestino, // ✅ guardamos el teléfono para reenvío
+          telefono: telefonoDestino,
         };
         setHistorialAlertas(prev => [nuevaAlerta, ...prev]);
 
