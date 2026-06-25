@@ -95,6 +95,7 @@ def agricultor_existe(numero):
             SELECT COUNT(*) as total
             FROM `agrosmart-tech-mlops.agrosmart_data.agricultores`
             WHERE telefono = '{numero}'
+            AND fecha_registro >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 72 HOUR)
         """
         resultado = client.query(query).result()
         return list(resultado)[0].total > 0
