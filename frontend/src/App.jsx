@@ -10,7 +10,6 @@ import Login from './views/login.jsx';
 
 import Overview from './views/overview.jsx';
 import Analitica from './views/analitica.jsx';
-import Guardian from './views/guardian.jsx';
 import Alerts from './views/alerts.jsx';
 import Simulador from './views/simulador.jsx';
 
@@ -275,7 +274,6 @@ function App() {
               }
             />
             <Route path="analitica" element={<Analitica parcelas={parcelas} zonas={zonas} hectareaSeleccionada={hectareaSeleccionada} setHectareaSeleccionada={setHectareaSeleccionada} />} />
-            <Route path="guardian" element={<Guardian riesgo={riesgo} fertilizante={fertilizante} datosSensores={datosSensores} />} />
             <Route path="alertas" element={<Alerts historialAlertas={historialAlertas} manejarAprobacionAlerta={manejarAprobacionAlerta} confirmarAlerta={confirmarAlerta} />} />
             <Route path="record" element={<Record historialAlertas={historialAlertas} />} />
             <Route path="simulador" element={<Simulador />} />

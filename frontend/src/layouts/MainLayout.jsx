@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FlaskConical, TrendingUp, ShieldCheck, Sprout, BellRing, ClipboardList, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
+import { LayoutDashboard, FlaskConical, TrendingUp, Sprout, BellRing, ClipboardList, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { signOut } from 'firebase/auth';
 
@@ -36,7 +36,7 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
           {/* LOGO Y TÍTULO */}
           <h1 className={`font-bold flex items-center mb-8 transition-all duration-300 ${isHovered ? 'px-2' : 'justify-center'}`}>
             <Sprout size={32} className="shrink-0 text-green-600" />
-            <span className={`text-2xl ml-3 overflow-hidden whitespace-nowrap transition-all duration-300 ${isHovered ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>
+            <span className={`text-2xl ml-3 overflow-hidden whitespace-nowrap transition-all duration-300 ${isHovered ? 'w-auto opacity-100' : 'w-0 opacity-0'} text-green-600`}>
               AgroSmart
             </span>
           </h1>
@@ -64,24 +64,6 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
             <NavLink to="/analitica" className={({ isActive }) => `flex items-center rounded-xl transition-all duration-200 ${isHovered ? 'px-4 py-3 gap-3' : 'justify-center py-3'} ${isActive ? 'bg-white shadow-sm font-bold text-agro-900 border border-gray-100' : 'bg-transparent text-agro-800 hover:bg-gray-200/50'}`}>
               <TrendingUp size={22} className="shrink-0" />
               <span className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${isHovered ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>Analítica</span>
-            </NavLink>
-
-            <NavLink
-              to="/guardian"
-              className={({ isActive }) =>
-                `flex items-center rounded-xl transition-all duration-200 ${
-                  isHovered ? 'px-4 py-3 gap-3' : 'justify-center py-3'
-                } ${
-                  isActive
-                    ? 'bg-white shadow-sm font-bold text-agro-900 border border-gray-100'
-                    : 'bg-transparent text-agro-800 hover:bg-gray-200/50'
-                }`
-              }
-            >
-              <ShieldCheck size={22} className="shrink-0" />
-              <span className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${isHovered ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>
-                Guardián
-              </span>
             </NavLink>
 
             <NavLink

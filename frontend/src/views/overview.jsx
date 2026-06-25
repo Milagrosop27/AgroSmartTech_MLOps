@@ -368,7 +368,7 @@ const Overview = ({
     : [];
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className="p-8 bg-gray-50 min-h-screen rounded-3xl">
       <header className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-3xl font-bold text-gray-800">Dashboard Ejecutivo</h2>

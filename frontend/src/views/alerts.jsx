@@ -188,7 +188,7 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
   };
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className="p-8 bg-gray-50 min-h-screen rounded-3xl">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
 
         {/* Header */}

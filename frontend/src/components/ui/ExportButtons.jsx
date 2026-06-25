@@ -1,10 +1,27 @@
 import { FileText, FileSpreadsheet } from 'lucide-react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; // <-- Cambio 1: Importación directa
+import autoTable from 'jspdf-autotable';
+
+const traducirRiesgo = (diagnostico) => {
+  switch (diagnostico) {
+    case 'Severe':   return 'Crítico';
+    case 'Moderate': return 'Moderado';
+    case 'Mild':     return 'Leve';
+    default:         return diagnostico || '';
+  }
+};
+
+const traducirEstado = (estado) => {
+  switch (estado) {
+    case 'SUCCESS': return 'Realizado';
+    case 'TIMEOUT': return 'Sin respuesta';
+    case 'PENDING': return 'Esperando';
+    default:        return estado || '';
+  }
+};
 
 const ExportButtons = ({ historialAlertas }) => {
 
-  // === LÓGICA PARA EXPORTAR A PDF ===
   const exportarPDF = () => {
     if (!historialAlertas || historialAlertas.length === 0) return;
 
@@ -15,24 +32,22 @@ const ExportButtons = ({ historialAlertas }) => {
     const filas = historialAlertas.map(alerta => [
       alerta.fecha,
       alerta.lote,
-      alerta.diagnostico,
+      traducirRiesgo(alerta.diagnostico),
       alerta.recomendacion,
-      alerta.estado
+      traducirEstado(alerta.estado)
     ]);
 
-    // <-- Cambio 2: Uso directo de autoTable pasándole el documento
     autoTable(doc, {
       head: [columnas],
       body: filas,
       startY: 20,
       theme: 'grid',
-      headStyles: { fillColor: [22, 163, 74] } // Verde Tailwind
+      headStyles: { fillColor: [22, 163, 74] }
     });
 
     doc.save(`AgroSmart_Alertas_${new Date().getTime()}.pdf`);
   };
 
-  // === LÓGICA PARA EXPORTAR A CSV ===
   const exportarCSV = () => {
     if (!historialAlertas || historialAlertas.length === 0) return;
 
@@ -40,9 +55,9 @@ const ExportButtons = ({ historialAlertas }) => {
     const filas = historialAlertas.map(alerta => [
       `"${alerta.fecha}"`,
       `"${alerta.lote}"`,
-      `"${alerta.diagnostico}"`,
+      `"${traducirRiesgo(alerta.diagnostico)}"`,  // ✅ traducido
       `"${alerta.recomendacion}"`,
-      `"${alerta.estado}"`
+      `"${traducirEstado(alerta.estado)}"`          // ✅ traducido
     ]);
 
     const contenidoCSV = [

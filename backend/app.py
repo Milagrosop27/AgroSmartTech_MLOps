@@ -455,6 +455,7 @@ def obtener_agricultores():
         query = """
             SELECT telefono, nombre, apellidos, area, fecha_registro
             FROM `agrosmart-tech-mlops.agrosmart_data.agricultores`
+            WHERE fecha_registro >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 72 HOUR)
             ORDER BY area ASC, fecha_registro ASC
         """
         results = client.query(query).result()
