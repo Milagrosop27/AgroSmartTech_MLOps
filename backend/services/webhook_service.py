@@ -113,6 +113,7 @@ def asignar_area():
             SELECT area
             FROM `agrosmart-tech-mlops.agrosmart_data.agricultores`
             WHERE area IS NOT NULL
+            AND fecha_registro >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 72 HOUR)
             ORDER BY fecha_registro ASC
         """
         resultado = client.query(query).result()
