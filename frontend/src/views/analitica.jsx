@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { Thermometer, Droplets, Activity, AlertTriangle } from 'lucide-react';
 
-const COLORES_DONA_4 = ['#16a34a', '#eab308', '#f59e0b', '#dc2626'];
+const COLORES_DONA_4 = ['#16a34a', '#eab308', '#f55d0b', '#dc2626'];
 
 const TooltipDona = ({ active, payload }) => {
   if (active && payload && payload.length) {
