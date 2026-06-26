@@ -48,7 +48,7 @@ def actualizar_alerta_firestore(telefono):
         actualizado = False
         for doc in resultados:
             # ¡Aquí está la magia! Cambiamos PENDING o TIMEOUT a SUCCESS
-            doc.reference.update({'estado': 'SUCCESS'})
+            doc.reference.update({'estado': 'Realizado'})
             print(f"✅ Firestore: Alerta {doc.id} actualizada a SUCCESS para {telefono}")
             actualizado = True
 

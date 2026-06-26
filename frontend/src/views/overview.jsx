@@ -98,7 +98,7 @@ const HeroBienvenida = () => {
   );
 };
 
-// --- MODAL SELECTOR DE AGRICULTOR ---
+
 const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
   const [agricultores, setAgricultores]   = useState([]);
   const [seleccionado, setSeleccionado]   = useState(null);
@@ -463,7 +463,7 @@ const Overview = ({
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-        <div className={`${bgRiesgo} p-6 rounded-xl shadow-sm border flex items-start justify-between`}>
+        <div className={`${bgRiesgo} p-6 rounded-xl shadow-xl flex items-start justify-between`}>
           <div>
             <p className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Nivel de Riesgo</p>
             <h3 className={`text-3xl font-bold mt-2 ${colorRiesgo}`}>{nivelRiesgo}</h3>
@@ -476,7 +476,7 @@ const Overview = ({
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border flex items-start justify-between">
+        <div className="bg-white p-6 rounded-xl shadow-xl  flex items-start justify-between">
           <div>
             <p className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Sectores en Alerta</p>
             <h3 className="text-3xl font-bold text-amber-700 mt-2">{sectoresEnAlerta}</h3>
@@ -485,7 +485,7 @@ const Overview = ({
           <div className="p-3 bg-amber-50 text-amber-600 rounded-lg"><MapPin size={24} /></div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border flex items-start justify-between">
+        <div className="bg-white p-6 rounded-xl shadow-xl flex items-start justify-between">
           <div>
             <p className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Salud Vegetal (NDVI)</p>
             <h3 className="text-3xl font-bold text-green-700 mt-2">{saludVegetal}</h3>

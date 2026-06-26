@@ -432,7 +432,7 @@ def despachar_alerta_whatsapp():
                     "cultivo": cultivo,
                     "diagnostico": riesgo, # Llamado diagnostico para que React lo lea en los gráficos
                     "accion": accion,
-                    "estado": "PENDING",
+                    "estado": "Esperando",
                     "fecha_hora": firestore.SERVER_TIMESTAMP
                 }
                 db_firestore.collection('historial_alertas').add(nueva_alerta)
@@ -466,7 +466,7 @@ def recibir_eventos_whatsapp():
             try:
                 alertas_ref = db_firestore.collection('historial_alertas')
                 # Buscamos los documentos de este teléfono que estén esperando confirmación
-                docs = alertas_ref.where('telefono', '==', telefono).where('estado', '==', 'PENDING').stream()
+                docs = alertas_ref.where('telefono', '==', telefono).where('estado', '==', 'Esperando').stream()
 
                 for doc in docs:
                     # Actualizamos el estado al valor que tu React use para el botón verde (ej: "Realizado")

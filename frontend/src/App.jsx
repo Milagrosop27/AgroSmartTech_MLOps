@@ -267,7 +267,7 @@ function App() {
               }
             />
             <Route path="analitica" element={<Analitica parcelas={parcelas} zonas={zonas} hectareaSeleccionada={hectareaSeleccionada} setHectareaSeleccionada={setHectareaSeleccionada} />} />
-            <Route path="alertas" element={<Alerts manejarAprobacionAlerta={manejarAprobacionAlerta} confirmarAlerta={confirmarAlerta} />} />
+            <Route path="alertas" element={<Alerts manejarAprobacionAlerta={manejarAprobacionAlerta} />} />
             <Route path="record" element={<Record historialAlertas={historialAlertas} />} />
             <Route path="simulador" element={<Simulador />} />
             <Route path="*" element={<div className="p-10 text-center"><h2 className="text-3xl font-bold text-red-500 mb-4">Ruta no encontrada</h2></div>} />

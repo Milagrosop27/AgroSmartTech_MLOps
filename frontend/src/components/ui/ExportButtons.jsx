@@ -28,14 +28,43 @@ const ExportButtons = ({ historialAlertas }) => {
     const doc = new jsPDF();
     doc.text("Historial de Alertas - AgroSmart Tech", 14, 15);
 
+    // 1. Mantenemos tus columnas iguales
     const columnas = ["FECHA", "LOTE", "DIAGNÓSTICO", "ACCIÓN", "ESTADO"];
-    const filas = historialAlertas.map(alerta => [
-      alerta.fecha,
-      alerta.lote,
-      traducirRiesgo(alerta.diagnostico),
-      alerta.recomendacion,
-      traducirEstado(alerta.estado)
-    ]);
+
+// 2. Mapeamos las filas corrigiendo los nombres de los campos y agregando el temporizador
+    const filas = historialAlertas.map(alerta => {
+
+      // --- LÓGICA DEL TEMPORIZADOR PARA EL ESTADO ---
+      let estadoFinal = traducirEstado(alerta.estado); // Por defecto: "Esperando..." o "Realizado"
+
+      if (alerta.estado === "PENDING" && alerta.fecha_hora) {
+        // Convertimos la fecha de la alerta a milisegundos
+        // (Soporta si viene como Firestore Timestamp {seconds: ...} o como String ISO)
+        const fechaAlerta = alerta.fecha_hora.seconds
+            ? new Date(alerta.fecha_hora.seconds * 1000)
+            : new Date(alerta.fecha_hora);
+
+        const ahora = new Date();
+        const diferenciaMinutos = (ahora - fechaAlerta) / (1000 * 60);
+
+        // ⏱️ SI PASARON MÁS DE 5 MINUTOS Y SIGUE PENDIENTE -> CAMBIA A REENVIAR
+        if (diferenciaMinutos >= 5) {
+          estadoFinal = "Reenviar";
+        }
+      }
+      // ----------------------------------------------
+
+      return [
+        alerta.fecha_hora?.seconds
+            ? new Date(alerta.fecha_hora.seconds * 1000).toLocaleString()
+            : alerta.fecha || new Date(alerta.fecha_hora).toLocaleString(),
+
+        alerta.farm_id || "Sin Lote",   // 👈 Corregido: cambia .lote por .farm_id
+        traducirRiesgo(alerta.diagnostico),
+        alerta.accion || "Sin Acción",   // 👈 Corregido: cambia .recomendacion por .accion
+        estadoFinal                     // 👈 Usa el estado calculado con el temporizador
+      ];
+    });
 
     autoTable(doc, {
       head: [columnas],
