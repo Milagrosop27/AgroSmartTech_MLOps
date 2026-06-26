@@ -1,6 +1,7 @@
 // src/config/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB-QibNeyXJvhp195ELaPDxuU1yCO-alT4",
@@ -16,3 +17,4 @@ const app = initializeApp(firebaseConfig);
 
 // Exportar la "llave" de autenticación para que React la use
 export const auth = getAuth(app);
+export const db = getFirestore(app, "alertas-agrosmart");

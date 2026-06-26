@@ -22,26 +22,20 @@ function App() {
   const [cargandoAuth, setCargandoAuth] = useState(true);
   const [riesgo, setRiesgo] = useState("Esperando...");
   const [fertilizante, setFertilizante] = useState("Esperando...");
-  const [notificacion, setNotificacion] = useState({ mostrar: false, mensaje: '', tipo: '' });
-
-  const [historialAlertas, setHistorialAlertas] = useState(() => {
-    const guardado = localStorage.getItem('agro_history_v1');
-    if (!guardado) return [];
-    const datos = JSON.parse(guardado);
-    const idsVistos = new Set();
-    return datos.filter(alerta => {
-      if (idsVistos.has(alerta.id)) return false;
-      idsVistos.add(alerta.id);
-      return true;
-    });
-  });
-
+  const [notificacion, setNotificacion] = useState({ mostrar: false, mensaje: '', tipo: '' })
+  const [historialAlertas, setHistorialAlertas] = useState([]);
   const [datosSensores, setDatosSensores] = useState({ temp: 0, hum: 0, ph: 0, ndvi: 0 });
   const [historialGrafico, setHistorialGrafico] = useState([]);
   const [parcelas, setParcelas] = useState([]);
   const [origenDatos, setOrigenDatos] = useState("cargando");
   const [hectareaSeleccionada, setHectareaSeleccionada] = useState(null);
   const [zonas, setZonas] = useState({ hectareas: [], sectores_por_hectarea: {} });
+
+
+  const mostrarNotificacion = (mensaje, tipo = 'success') => {
+    setNotificacion({ mostrar: true, mensaje, tipo });
+    setTimeout(() => setNotificacion({ mostrar: false, mensaje: '', tipo: '' }), 4000);
+  };
 
   useEffect(() => {
     const desubscribir = onAuthStateChanged(auth, (user) => {
@@ -52,8 +46,11 @@ function App() {
   }, []);
 
   useEffect(() => {
+  // Solo guarda si realmente hay alertas cargadas, evitando borrar el storage en el boot inicial
+  if (historialAlertas && historialAlertas.length > 0) {
     localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
-  }, [historialAlertas]);
+  }
+}, [historialAlertas]);
 
   useEffect(() => {
     if (!usuario) return;
@@ -147,7 +144,7 @@ function App() {
               return alerta;
             })
           );
-          mostrarNotificacion('✅ Acción confirmada por el agricultor.');
+          mostrarNotificacion('Acción confirmada por el agricultor.');
         }
       } catch (error) {
         console.error('Error en polling de confirmaciones:', error);
@@ -155,12 +152,7 @@ function App() {
     }, 5000);
 
     return () => clearInterval(intervalo);
-  }, [usuario, historialAlertas]);
-
-  const mostrarNotificacion = (mensaje, tipo = 'success') => {
-    setNotificacion({ mostrar: true, mensaje, tipo });
-    setTimeout(() => setNotificacion({ mostrar: false, mensaje: '', tipo: '' }), 4000);
-  };
+  }, [usuario, historialAlertas, mostrarNotificacion]);
 
   const manejarAprobacionAlerta = async (registroEspecifico, telefonoDestino) => {
     try {
@@ -189,8 +181,8 @@ function App() {
         const idUnico = Date.now();
         const nuevaAlerta = {
           id: idUnico,
-          fecha: new Date().toLocaleString(),       // ← para mostrar en tabla
-          fechaISO: new Date().toISOString(),       // ← para filtrar
+          fecha: new Date().toLocaleString(),
+          fechaISO: new Date().toISOString(),
           lote: registroEspecifico.farm_id || "Lote Desconocido",
           diagnostico: registroEspecifico.crop_disease_status || riesgo,
           recomendacion: fertilizante,
@@ -205,7 +197,7 @@ function App() {
               a.id === idUnico && a.estado === 'PENDING' ? { ...a, estado: 'TIMEOUT' } : a
             )
           );
-        }, 60000);
+        }, 600000);
 
       } else {
         mostrarNotificacion("Error al comunicarse con WhatsApp", "error");
@@ -270,11 +262,12 @@ function App() {
                   zonas={zonas}
                   hectareaSeleccionada={hectareaSeleccionada}
                   setHectareaSeleccionada={setHectareaSeleccionada}
+                  usuario={usuario}
                 />
               }
             />
             <Route path="analitica" element={<Analitica parcelas={parcelas} zonas={zonas} hectareaSeleccionada={hectareaSeleccionada} setHectareaSeleccionada={setHectareaSeleccionada} />} />
-            <Route path="alertas" element={<Alerts historialAlertas={historialAlertas} manejarAprobacionAlerta={manejarAprobacionAlerta} confirmarAlerta={confirmarAlerta} />} />
+            <Route path="alertas" element={<Alerts manejarAprobacionAlerta={manejarAprobacionAlerta} confirmarAlerta={confirmarAlerta} />} />
             <Route path="record" element={<Record historialAlertas={historialAlertas} />} />
             <Route path="simulador" element={<Simulador />} />
             <Route path="*" element={<div className="p-10 text-center"><h2 className="text-3xl font-bold text-red-500 mb-4">Ruta no encontrada</h2></div>} />

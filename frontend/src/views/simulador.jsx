@@ -94,7 +94,7 @@ const Simulador = () => {
           Laboratorio de Simulación
         </h2>
         <p className="text-gray-500 text-sm mt-2">
-          Entorno aislado (Sandbox). Ingresa parámetros hipotéticos para evaluar la respuesta sin afectar los datos reales.
+          Ingresa parámetros.
         </p>
       </header>
 

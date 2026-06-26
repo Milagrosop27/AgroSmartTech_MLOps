@@ -67,7 +67,8 @@ const Analitica = ({ parcelas = [] }) => {
   // Telemetría con conversión UTC → Perú
   const telemetriaMap = {};
   datos.forEach(p => {
-    const horaUTC   = p.fecha ? p.fecha.substring(0, 5) : 'N/A';
+    // Forzamos a que sea String para que el substring() nunca rompa la aplicación
+    const horaUTC = p.fecha ? String(p.fecha).substring(0, 5) : 'N/A';
     const horaLocal = utcAHoraLocal(horaUTC);
     if (!telemetriaMap[horaLocal]) telemetriaMap[horaLocal] = { count: 0, temp: 0, hum: 0 };
     telemetriaMap[horaLocal].temp  += Number(p.temperature_C  || 0);

@@ -45,11 +45,11 @@ CHUNK_SIZE         = 500  # Límite de seguridad para payload (no se alcanzará 
 # (H1 = zona costera más húmeda, H5 = zona interior más cálida y seca).
 # ---------------------------------------------------------------------------
 HECTAREAS_CONFIG = {
-    "H1": {"crop_type": "Maíz",      "temp_base": 22.0, "hum_base": 72.0},
-    "H2": {"crop_type": "Trigo",     "temp_base": 24.5, "hum_base": 65.0},
-    "H3": {"crop_type": "Papa",      "temp_base": 18.0, "hum_base": 78.0},
-    "H4": {"crop_type": "Quinua",    "temp_base": 15.5, "hum_base": 60.0},
-    "H5": {"crop_type": "Espárrago", "temp_base": 28.0, "hum_base": 50.0},
+    "H1": {"crop_type": "Maíz",    "temp_base": 22.0, "hum_base": 70.0},
+    "H2": {"crop_type": "Trigo",   "temp_base": 20.0, "hum_base": 65.0},
+    "H3": {"crop_type": "Soja",    "temp_base": 24.0, "hum_base": 70.0},  # La soja prefiere clima cálido y húmedo
+    "H4": {"crop_type": "Algodón", "temp_base": 26.0, "hum_base": 60.0},  # El algodón requiere más calor y menos humedad
+    "H5": {"crop_type": "Arroz",   "temp_base": 25.0, "hum_base": 80.0},  # El arroz requiere alta humedad
 }
 
 SECTORES_POR_HECTAREA = [f"S{str(i).zfill(2)}" for i in range(1, 11)]  # S01 … S10
@@ -73,58 +73,70 @@ for h_id, h_conf in HECTAREAS_CONFIG.items():
 
 def aplicar_sesgo_zona(zona: dict, df_base_row: pd.Series) -> dict:
     """
-    Toma una fila del dataset base y la ajusta con el sesgo micro-climático
-    de la zona específica.
-
-    El sesgo se compone de:
-      - Diferencia entre la temp/hum base de la zona y la media global del dataset.
-      - Ruido gaussiano pequeño para simular variabilidad natural instante a instante.
+    Fuerza los valores para inducir los estados Mild, Moderate o Severe en el modelo.
     """
-    # Ruido instante-a-instante
-    ruido_temp = float(np.random.normal(0, 0.4))
-    ruido_hum  = float(np.random.normal(0, 1.0))
-    ruido_ph   = float(np.random.normal(0, 0.05))
-    ruido_ndvi = float(np.random.normal(0, 0.01))
+    # 1. 85% Mild (Sano), 10% Moderate (Alerta), 5% Severe (Crítico)
+    estado_target = np.random.choice(
+        ['Mild', 'Moderate', 'Severe'],
+        p=[0.85, 0.10, 0.05]
+    )
 
-    # Temperatura y humedad con sesgo de zona
-    temperatura = round(zona["temp_base"] + ruido_temp, 2)
-    humedad     = round(float(np.clip(zona["hum_base"] + ruido_hum, 0, 100)), 2)
+    ruido_temp = float(np.random.normal(0, 0.5))
+    ruido_hum = float(np.random.normal(0, 1.5))
 
-    # El resto de variables las tomamos del dataset base con ruido leve
-    ph   = round(float(np.clip(df_base_row.get("soil_pH",  6.5) + ruido_ph,  4.0, 9.0)), 2)
-    ndvi = round(float(np.clip(df_base_row.get("NDVI_index", 0.5) + ruido_ndvi, 0.0, 1.0)), 3)
+    # 2. Fabricamos las condiciones INCLUYENDO soil_moisture_%
+    if estado_target == 'Mild':
+        # Condiciones óptimas (El dashboard lo pintará verde)
+        temperatura = zona["temp_base"] + ruido_temp
+        humedad = zona["hum_base"] + ruido_hum
+        ph = float(np.clip(df_base_row.get("soil_pH", 6.5) + np.random.normal(0, 0.1), 6.0, 7.0))
+        ndvi = float(np.clip(df_base_row.get("NDVI_index", 0.8) + np.random.normal(0, 0.05), 0.7, 0.9))
+        hum_suelo = float(np.clip(np.random.normal(80, 5), 70, 100))  # Bien regado
 
-    # Variables agronómicas del dataset base (sin modificar para mantener correlación real)
+    elif estado_target == 'Moderate':
+        # Algo de estrés (El dashboard lo pintará amarillo/naranja)
+        temperatura = zona["temp_base"] + 4.0 + ruido_temp
+        humedad = zona["hum_base"] - 15.0 + ruido_hum
+        ph = float(np.clip(df_base_row.get("soil_pH", 6.5) + np.random.normal(0, 0.2), 5.5, 7.5))
+        ndvi = float(np.clip(df_base_row.get("NDVI_index", 0.5) + np.random.normal(0, 0.05), 0.4, 0.6))
+        hum_suelo = float(np.clip(np.random.normal(40, 5), 30, 50))  # Secándose
+
+    else:  # Severe
+        # Estrés extremo (El dashboard lo pintará rojo y lanzará WhatsApp)
+        temperatura = zona["temp_base"] + 8.0 + ruido_temp
+        humedad = zona["hum_base"] - 25.0 + ruido_hum
+        ph = float(np.clip(df_base_row.get("soil_pH", 6.5) + np.random.normal(0, 0.5), 4.0, 9.0))
+        ndvi = float(np.clip(df_base_row.get("NDVI_index", 0.2) + np.random.normal(0, 0.05), 0.1, 0.3))
+        hum_suelo = float(np.clip(np.random.normal(15, 3), 5, 25))  # Sequía severa
+
+    # 3. Heredamos el resto de variables agronómicas
     campos_agronomicos = [
         "total_days", "P", "region", "N", "irrigation_type",
-        "rainfall_mm", "soil_moisture_%", "sunlight_hours", "K",
+        "rainfall_mm", "sunlight_hours", "K",
         "yield_kg_per_hectare", "fertilizer_type", "pesticide_usage_ml",
     ]
+
     registro = {}
     for campo in campos_agronomicos:
         if campo in df_base_row.index:
             val = df_base_row[campo]
-
-            # Convertir tipos de numpy/pandas a tipos nativos de Python
             if isinstance(val, (np.integer, np.int64)):
                 val = int(val)
             elif isinstance(val, (np.floating, np.float64)):
                 val = float(val)
-
-            # Evitar NaN / Inf
             if isinstance(val, float) and (np.isnan(val) or np.isinf(val)):
                 val = 0
-
             registro[campo] = val
 
-    # Sobreescribimos con valores geo-referenciados
-    registro["temperature_C"]  = temperatura
-    registro["humidity_%"]     = humedad
-    registro["soil_pH"]        = ph
-    registro["NDVI_index"]     = ndvi
-    registro["farm_id"]        = zona["farm_id"]
-    registro["crop_type"]      = zona["crop_type"]
-    registro["timestamp"]      = datetime.datetime.now().isoformat()
+    # 4. Sobreescribimos con nuestros valores forzados
+    registro["temperature_C"] = round(float(temperatura), 2)
+    registro["humidity_%"] = round(float(np.clip(humedad, 0, 100)), 2)
+    registro["soil_pH"] = round(ph, 2)
+    registro["NDVI_index"] = round(ndvi, 3)
+    registro["soil_moisture_%"] = round(hum_suelo, 2)
+    registro["farm_id"] = zona["farm_id"]
+    registro["crop_type"] = zona["crop_type"]
+    registro["timestamp"] = datetime.datetime.now().isoformat()
 
     return registro
 
@@ -176,7 +188,7 @@ if __name__ == "__main__":
     logging.info(f"  Sectores  : {len(ZONAS)} zonas (10 por hectárea)")
     logging.info(f"  Intervalo : {INTERVALO_SEGUNDOS} segundos por ciclo")
     logging.info("  Presiona Ctrl+C para detener.")
-    logging.info("=" * 60)
+    logging.info("=" * 300)
 
     # Carga del dataset base (una sola vez)
     try:

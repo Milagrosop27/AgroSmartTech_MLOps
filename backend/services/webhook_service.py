@@ -1,14 +1,26 @@
+import os
 from google.cloud import bigquery
 from datetime import datetime
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+
+CARPETA_BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RUTA_JSON = os.path.join(CARPETA_BACKEND, "firebase-credenciales.json")
+
+# ========================================================
+# 1. INICIALIZAR FIREBASE (Añadir esto en la parte superior)
+# ========================================================
+# Si ya tienes credenciales por defecto de Google Cloud, esto basta:
+if not firebase_admin._apps:
+    firebase_admin.initialize_app()
+
+
+db_firestore = firestore.client(database_id="alertas-agrosmart")
 
 _bq_client = None
-
-# Áreas disponibles en orden de asignación
 AREAS_DISPONIBLES = ['H1', 'H2', 'H3', 'H4', 'H5']
-
-# Estado temporal de registro por número (en memoria)
 estados_registro = {}
-
 
 def obtener_bq_client():
     global _bq_client
@@ -21,6 +33,32 @@ def obtener_bq_client():
     return _bq_client
 
 
+def actualizar_alerta_firestore(telefono):
+    try:
+        # Busca en la colección 'historial_alertas' buscando el número de teléfono
+        # y limitamos a la alerta más reciente.
+        alertas_ref = db_firestore.collection('historial_alertas')
+
+        # Filtramos por el teléfono exacto
+        query = alertas_ref.where('telefono', '==', telefono).order_by('fecha_hora',
+                                                                       direction=firestore.Query.DESCENDING).limit(1)
+
+        resultados = query.stream()
+
+        actualizado = False
+        for doc in resultados:
+            # ¡Aquí está la magia! Cambiamos PENDING o TIMEOUT a SUCCESS
+            doc.reference.update({'estado': 'SUCCESS'})
+            print(f"✅ Firestore: Alerta {doc.id} actualizada a SUCCESS para {telefono}")
+            actualizado = True
+
+        if not actualizado:
+            print(f"⚠️ No se encontraron alertas pendientes para el número {telefono}")
+
+    except Exception as e:
+        print(f"❌ Error al conectar con Firestore: {e}")
+
+
 def procesar_mensaje_entrante(data):
     mensaje = data.get('Body', '').strip()
     numero = data.get('From', '').replace('whatsapp:', '')
@@ -28,6 +66,9 @@ def procesar_mensaje_entrante(data):
 
     # CONFIRMAR tiene prioridad absoluta
     if 'CONFIRMAR' in mensaje_upper:
+        # LLAMAMOS A LA NUEVA FUNCIÓN AQUÍ ANTES DE RETORNAR
+        actualizar_alerta_firestore(numero)
+
         return {"status": "confirmado", "telefono": numero}
 
     # Verificar si ya está registrado

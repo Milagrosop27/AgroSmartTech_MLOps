@@ -1,5 +1,9 @@
-import React, { useState, useMemo, Fragment } from 'react';
+import { useEffect, useState, useMemo, Fragment } from 'react';
 import { CheckCircle, Send, Clock, Filter, X, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+
+import { db } from '../config/firebase';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+
 
 const traducirRiesgo = (diagnostico) => {
   switch (diagnostico) {
@@ -91,7 +95,27 @@ const MiniCalendario = ({ fechaSeleccionada, onSeleccionar, onCerrar }) => {
 
 const ALERTAS_POR_PAGINA = 10;
 
-const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) => {
+const Alerts = ({ manejarAprobacionAlerta, confirmarAlerta }) => {
+  // 1. NUEVO: Estado para guardar las alertas que vienen de la nube
+  const [historialAlertas, setHistorialAlertas] = useState([]);
+
+  // 2. NUEVO: Efecto para escuchar Firestore en tiempo real
+  useEffect(() => {
+    const q = query(collection(db, "historial_alertas"), orderBy("fecha_hora", "desc"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const alertasCloud = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Si necesitas transformar la fecha, hazlo aquí:
+        fecha: doc.data().fecha_hora?.toDate().toLocaleString('es-PE')
+      }));
+      setHistorialAlertas(alertasCloud);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const [filtroFecha, setFiltroFecha] = useState('todos');
   const [fechaExacta, setFechaExacta] = useState(null);
   const [mostrarCalendario, setMostrarCalendario] = useState(false);

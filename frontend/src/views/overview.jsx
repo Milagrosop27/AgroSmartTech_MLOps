@@ -1,8 +1,5 @@
 // src/views/overview.jsx
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer
-} from 'recharts';
+
 import { useState, useEffect } from 'react';
 import { AlertTriangle, Leaf, MapPin, ChevronLeft, X, User } from 'lucide-react';
 
@@ -20,7 +17,7 @@ const getBadgeSubsector = (estado) => {
   switch (estado) {
     case 'Severe':   return 'bg-red-600 text-white';
     case 'Moderate': return 'bg-amber-500 text-white';
-    case 'Mild':     return 'bg-yellow-400 text-gray-800';
+    case 'Mild':     return 'bg-green-600 text-white';
     default:         return 'bg-green-600 text-white';
   }
 };
@@ -29,7 +26,7 @@ const getLabelEstado = (estado) => {
   switch (estado) {
     case 'Severe':   return 'Crítico';
     case 'Moderate': return 'Moderado';
-    case 'Mild':     return 'Leve';
+    case 'Mild':     return 'Sano';
     default:         return 'Sano';
   }
 };
@@ -43,11 +40,69 @@ const traducirRiesgo = (diagnostico) => {
   }
 };
 
+// --- SALUDO SEGÚN HORA ---
+const getSaludo = () => {
+  const hora = new Date().getHours();
+  if (hora >= 5 && hora < 12)  return 'Buenos días';
+  if (hora >= 12 && hora < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+};
+
+// --- FECHA EN ESPAÑOL ---
+const getFechaFormateada = () => {
+  return new Date().toLocaleDateString('es-PE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+};
+
+// --- HERO DE BIENVENIDA ---
+const HeroBienvenida = () => {
+  const saludo   = getSaludo();
+  const fecha    = getFechaFormateada();
+  const nombre   = 'Jefe de producción';
+
+  return (
+    <div className="relative w-full rounded-2xl overflow-hidden mb-8 h-52 md:h-60">
+      {/* Imagen de fondo */}
+      <img
+        src="https://i.pinimg.com/1200x/50/d3/6d/50d36d2f4ed564da4ae15a2aa94ae02b.jpg"
+        alt="Campo agrícola"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+
+      {/* Overlay degradado */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/40 to-transparent" />
+
+      {/* Contenido */}
+      <div className="relative z-10 h-full flex flex-col justify-center px-8 py-6">
+        <p className="text-white/70 text-sm font-medium tracking-widest uppercase mb-1">
+          {fecha}
+        </p>
+        <h1 className="text-white text-3xl md:text-4xl font-bold leading-tight mb-2">
+          {saludo}, {nombre} 👋
+        </h1>
+        <p className="text-white/80 text-sm md:text-base max-w-md leading-relaxed">
+          Selecciona una hectárea para explorar sus sectores.
+        </p>
+      </div>
+
+      {/* Badge live */}
+      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm border border-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+        En vivo
+      </div>
+    </div>
+  );
+};
+
 // --- MODAL SELECTOR DE AGRICULTOR ---
 const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
-  const [agricultores, setAgricultores] = useState([]);
-  const [seleccionado, setSeleccionado] = useState(null);
-  const [cargando, setCargando] = useState(true);
+  const [agricultores, setAgricultores]   = useState([]);
+  const [seleccionado, setSeleccionado]   = useState(null);
+  const [cargando, setCargando]           = useState(true);
 
   useEffect(() => {
     fetch('https://agrosmart-api-940420015515.us-central1.run.app/api/agricultores')
@@ -60,7 +115,6 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
       .catch(() => setCargando(false));
   }, []);
 
-  // Agrupar agricultores por área
   const agricultoresPorArea = agricultores.reduce((acc, a) => {
     const area = a.area || 'Sin área';
     if (!acc[area]) acc[area] = [];
@@ -73,8 +127,6 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
-
-        {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-gray-800">Enviar alerta</h3>
           <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -82,12 +134,11 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
           </button>
         </div>
 
-        {/* Info del sector */}
         <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-600">
           Sector: <span className="font-bold text-gray-800">{registro?.farm_id}</span>
           {' · '}
           Riesgo: <span className={`font-bold ${
-            registro?.crop_disease_status === 'Severe' ? 'text-red-600' :
+            registro?.crop_disease_status === 'Severe'   ? 'text-red-600'   :
             registro?.crop_disease_status === 'Moderate' ? 'text-amber-500' :
             'text-yellow-500'
           }`}>
@@ -95,13 +146,10 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
           </span>
         </div>
 
-        {/* Lista agrupada por área */}
         <p className="text-sm font-semibold text-gray-500 mb-2">Seleccionar agricultor:</p>
 
         {cargando ? (
-          <p className="text-sm text-gray-400 py-4 text-center animate-pulse">
-            Cargando agricultores...
-          </p>
+          <p className="text-sm text-gray-400 py-4 text-center animate-pulse">Cargando agricultores...</p>
         ) : agricultores.length === 0 ? (
           <div className="py-4 text-center">
             <p className="text-sm text-amber-600 font-semibold">No hay agricultores registrados.</p>
@@ -113,16 +161,11 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
           <div className="space-y-3 max-h-56 overflow-y-auto mb-4">
             {areasOrdenadas.map((area) => (
               <div key={area}>
-                {/* Encabezado de área */}
                 <div className="flex items-center gap-2 mb-1.5">
                   <MapPin size={12} className="text-green-600" />
-                  <span className="text-xs font-bold text-green-700 uppercase tracking-wider">
-                    {area}
-                  </span>
+                  <span className="text-xs font-bold text-green-700 uppercase tracking-wider">{area}</span>
                   <div className="flex-1 h-px bg-green-100" />
                 </div>
-
-                {/* Agricultores del área */}
                 <div className="space-y-1.5 pl-1">
                   {agricultoresPorArea[area].map((a) => (
                     <button
@@ -158,7 +201,6 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
           </div>
         )}
 
-        {/* Botones */}
         <div className="flex gap-2 mt-2">
           <button
             onClick={onCerrar}
@@ -179,7 +221,6 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
             Enviar alerta
           </button>
         </div>
-
       </div>
     </div>
   );
@@ -238,27 +279,61 @@ const SelectorHectareas = ({ zonas, hectareaSeleccionada, setHectareaSeleccionad
   );
 };
 
+// --- BANNER DE HECTÁREA SELECCIONADA ---
+const IMAGENES_CULTIVO = {
+  'Maíz':    'https://i.pinimg.com/1200x/ee/28/ed/ee28edb03efcb3ab9302a76a0af8b2e3.jpg',
+  'Trigo':   'https://i.pinimg.com/1200x/d5/e2/a4/d5e2a4205111236d3c20b71ee832a844.jpg',
+  'Arroz':   'https://i.pinimg.com/1200x/70/9e/05/709e05562f3a71cf882777c043713450.jpg',
+  'Soja':    'https://i.pinimg.com/1200x/a5/2a/76/a52a7642966856313a10bac8766036a5.jpg',
+  'Algodón': 'https://i.pinimg.com/736x/8c/ae/63/8cae638bf968e8f4e989f615518d47d0.jpg',
+  'default': 'https://i.pinimg.com/1200x/50/d3/6d/50d36d2f4ed564da4ae15a2aa94ae02b.jpg',
+};
+
+const BannerHectarea = ({ hectarea, cultivoActual, totalSectores, onVolver }) => {
+  const imagenUrl = IMAGENES_CULTIVO[cultivoActual] || IMAGENES_CULTIVO.default;
+
+  return (
+    <div className="relative w-full rounded-2xl overflow-hidden mb-6 h-36 md:h-44">
+      <img
+        src={imagenUrl}
+        alt={`Cultivo ${cultivoActual}`}
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-transparent" />
+
+      <div className="relative z-10 h-full flex flex-col justify-center px-7 py-5">
+        <button
+          onClick={onVolver}
+          className="flex items-center gap-1 text-white/70 hover:text-white text-xs font-semibold mb-2 transition-colors w-fit"
+        >
+          <ChevronLeft size={14} /> Todas las hectáreas
+        </button>
+        <h2 className="text-white text-2xl md:text-3xl font-bold leading-tight">
+          Hectárea {hectarea}
+        </h2>
+        <div className="flex items-center gap-3 mt-1.5">
+          <span className="text-white/80 text-sm">{totalSectores} sectores activos</span>
+          <span className="w-1 h-1 rounded-full bg-white/40" />
+          <span className="text-white/80 text-sm capitalize">{cultivoActual}</span>
+        </div>
+      </div>
+
+      <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm border border-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+        En vivo
+      </div>
+    </div>
+  );
+};
+
 // --- GRID DE SUBSECTORES ---
-const GridSubsectores = ({ sectores, parcelas, manejarAprobacionAlerta, onVolver, hectarea }) => {
-  const [modalRegistro, setModalRegistro] = useState(null); // ✅ estado del modal
+const GridSubsectores = ({ sectores, parcelas, manejarAprobacionAlerta }) => {
+  const [modalRegistro, setModalRegistro] = useState(null);
   const mapaUltimos = {};
   parcelas.forEach((p) => { mapaUltimos[p.farm_id] = p; });
 
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-3 mb-4">
-        <button
-          onClick={onVolver}
-          className="flex items-center gap-1 text-sm text-green-600 hover:text-green-800 font-semibold transition-colors"
-        >
-          <ChevronLeft size={16} /> Todas las hectáreas
-        </button>
-        <span className="text-gray-300">|</span>
-        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
-          Hectárea {hectarea} — {sectores.length} sectores
-        </h3>
-      </div>
-
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {sectores.map((farmId) => {
           const registro = mapaUltimos[farmId];
@@ -284,9 +359,9 @@ const GridSubsectores = ({ sectores, parcelas, manejarAprobacionAlerta, onVolver
                 </div>
               </div>
 
-              {registro && ['Severe', 'Moderate', 'Mild'].includes(estado) ? (
+              {registro && ['Severe', 'Moderate'].includes(estado) ? (
                 <button
-                  onClick={() => setModalRegistro(registro)} // ✅ abre el modal
+                  onClick={() => setModalRegistro(registro)}
                   className="mt-2 flex w-full items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-md text-xs font-semibold shadow transition-colors"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -305,7 +380,6 @@ const GridSubsectores = ({ sectores, parcelas, manejarAprobacionAlerta, onVolver
         })}
       </div>
 
-      {/* ✅ Modal selector de agricultor */}
       {modalRegistro && (
         <ModalAgricultor
           registro={modalRegistro}
@@ -324,17 +398,21 @@ const Overview = ({
   zonas = { hectareas: [], sectores_por_hectarea: {} },
   hectareaSeleccionada,
   setHectareaSeleccionada,
+  usuario = null,
 }) => {
   const datos = parcelas || [];
 
   const mapaSectores = {};
   datos.forEach((p) => { if (p.farm_id) mapaSectores[p.farm_id] = p; });
-  const sectoresActuales = Object.values(mapaSectores);
-  const totalSectores = sectoresActuales.length;
+  const sectoresActuales    = Object.values(mapaSectores);
+  const totalSectores       = sectoresActuales.length;
 
-  let cultivoActual = "Varios";
-  if (hectareaSeleccionada && sectoresActuales.length > 0) {
-    cultivoActual = sectoresActuales[0].crop_type || "Desconocido";
+  let cultivoActual = 'Varios';
+  if (hectareaSeleccionada) {
+    const primerSectorHectarea = sectoresActuales.find(
+      (p) => p.farm_id && p.farm_id.startsWith(hectareaSeleccionada + '_')
+    );
+    cultivoActual = primerSectorHectarea?.crop_type || 'Desconocido';
   }
 
   const severeCount      = sectoresActuales.filter((p) => p.crop_disease_status === 'Severe').length;
@@ -345,47 +423,30 @@ const Overview = ({
     : '0.00';
 
   let nivelRiesgo = 'Bajo'; let colorRiesgo = 'text-green-600'; let bgRiesgo = 'bg-green-50';
-  if (severeCount > 0)      { nivelRiesgo = 'Alto';  colorRiesgo = 'text-red-600';   bgRiesgo = 'bg-red-50'; }
-  else if (mildCount > 0)   { nivelRiesgo = 'Medio'; colorRiesgo = 'text-amber-600'; bgRiesgo = 'bg-amber-50'; }
-
-  const telemetriaMap = {};
-  datos.forEach(p => {
-    const min = p.fecha ? p.fecha.substring(0, 5) : 'N/A';
-    if (!telemetriaMap[min]) telemetriaMap[min] = { count: 0, temp: 0, hum: 0 };
-    telemetriaMap[min].temp  += Number(p.temperature_C   || 0);
-    telemetriaMap[min].hum   += Number(p['humidity_%']   || 0);
-    telemetriaMap[min].count += 1;
-  });
-
-  const telemetria = Object.keys(telemetriaMap).slice(-15).map(min => ({
-    fecha:         min,
-    temperature_C: Number((telemetriaMap[min].temp / telemetriaMap[min].count).toFixed(2)),
-    humidity:      Number((telemetriaMap[min].hum  / telemetriaMap[min].count).toFixed(2)),
-  }));
+  if (severeCount > 0)    { nivelRiesgo = 'Alto';  colorRiesgo = 'text-red-600';   bgRiesgo = 'bg-red-50'; }
+  else if (mildCount > 0) { nivelRiesgo = 'Medio'; colorRiesgo = 'text-amber-600'; bgRiesgo = 'bg-amber-50'; }
 
   const sectoresActivos = hectareaSeleccionada
     ? (zonas.sectores_por_hectarea[hectareaSeleccionada] || [])
     : [];
 
+  const nombreUsuario = usuario?.displayName || usuario?.email || null;
+
   return (
     <div className="p-8 bg-gray-50 min-h-screen rounded-3xl">
-      <header className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-800">Dashboard Ejecutivo</h2>
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-gray-500 text-sm">
-              {hectareaSeleccionada
-                ? `Mostrando: Hectárea ${hectareaSeleccionada}`
-                : 'Monitoreo en tiempo real — global'}
-            </p>
-            {hectareaSeleccionada && (
-              <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full">
-                Cultivo: {cultivoActual}
-              </span>
-            )}
-          </div>
-        </div>
-      </header>
+
+      {!hectareaSeleccionada && (
+        <HeroBienvenida nombreUsuario={nombreUsuario} />
+      )}
+
+      {hectareaSeleccionada && (
+        <BannerHectarea
+          hectarea={hectareaSeleccionada}
+          cultivoActual={cultivoActual}
+          totalSectores={sectoresActivos.length}
+          onVolver={() => setHectareaSeleccionada(null)}
+        />
+      )}
 
       <SelectorHectareas
         zonas={zonas}
@@ -398,8 +459,6 @@ const Overview = ({
           sectores={sectoresActivos}
           parcelas={datos}
           manejarAprobacionAlerta={manejarAprobacionAlerta}
-          onVolver={() => setHectareaSeleccionada(null)}
-          hectarea={hectareaSeleccionada}
         />
       )}
 

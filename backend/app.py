@@ -10,6 +10,16 @@ from google.cloud import bigquery
 import datetime
 import os
 import time
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+if not firebase_admin._apps:
+    RUTA_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "firebase-credenciales.json")
+    cred = credentials.Certificate(RUTA_JSON)
+    firebase_admin.initialize_app(cred)
+
+db_firestore = firestore.client(database_id="alertas-agrosmart")
+
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -406,6 +416,25 @@ def despachar_alerta_whatsapp():
         )
 
         if exito:
+            # =======================================================
+            # 2. CREAR LA ALERTA EN FIRESTORE COMO "PENDING"
+            # =======================================================
+            try:
+                nueva_alerta = {
+                    "telefono": telefono,
+                    "farm_id": farm_id,
+                    "cultivo": cultivo,
+                    "diagnostico": riesgo, # Llamado diagnostico para que React lo lea en los gráficos
+                    "accion": accion,
+                    "estado": "PENDING",
+                    "fecha_hora": firestore.SERVER_TIMESTAMP
+                }
+                db_firestore.collection('historial_alertas').add(nueva_alerta)
+                logging.info(f"✅ Firestore: Alerta PENDING registrada para {telefono}")
+            except Exception as e:
+                logging.error(f"❌ Error al guardar alerta en Firestore: {e}")
+            # =======================================================
+
             return jsonify({"status": "success", "sid": mensaje_o_error}), 200
         else:
             return jsonify({"status": "error", "detalles": mensaje_o_error}), 500
@@ -427,6 +456,19 @@ def recibir_eventos_whatsapp():
             telefono = resultado.get("telefono")
             confirmaciones_whatsapp.append(telefono)
             logging.info(f"Accion confirmada por el usuario {telefono}.")
+
+            try:
+                alertas_ref = db_firestore.collection('historial_alertas')
+                # Buscamos los documentos de este teléfono que estén esperando confirmación
+                docs = alertas_ref.where('telefono', '==', telefono).where('estado', '==', 'PENDING').stream()
+
+                for doc in docs:
+                    # Actualizamos el estado al valor que tu React use para el botón verde (ej: "Realizado")
+                    doc.reference.update({'estado': 'Realizado'})
+                    logging.info(f"✅ Firestore actualizado a 'Realizado' para el doc {doc.id}")
+
+            except Exception as e:
+                logging.error(f"❌ Error al actualizar estado en Firestore desde Webhook: {e}")
 
         elif resultado.get("respuesta"):
             resp.message(resultado["respuesta"])

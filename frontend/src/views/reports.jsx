@@ -1,4 +1,4 @@
-const reports = () => {
+const Reports = () => {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-gray-800">Panel General (Overview)</h1>
@@ -7,4 +7,4 @@ const reports = () => {
   );
 };
 
-export default reports;
+export default Reports;
