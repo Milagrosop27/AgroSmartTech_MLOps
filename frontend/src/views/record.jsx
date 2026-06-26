@@ -34,7 +34,7 @@ const Record = ({ historialAlertas }) => {
     return Object.values(mapa).sort((a, b) => a.hectarea.localeCompare(b.hectarea));
   }, [historialAlertas]);
 
-  const COLORES = ['#16a34a', '#22c55e', '#4ade80', '#86efac', '#bbf7d0'];
+  const COLORES = ['#16a34a', '#22c55e', '#45da7b', '#86efac', '#bbf7d0'];
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto w-full">
