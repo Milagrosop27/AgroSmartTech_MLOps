@@ -15,8 +15,14 @@ from firebase_admin import credentials, firestore
 
 if not firebase_admin._apps:
     RUTA_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "firebase-credenciales.json")
-    cred = credentials.Certificate(RUTA_JSON)
-    firebase_admin.initialize_app(cred)
+
+    # Si el archivo existe (estas en tu PC local)
+    if os.path.exists(RUTA_JSON):
+        cred = credentials.Certificate(RUTA_JSON)
+        firebase_admin.initialize_app(cred)
+    else:
+        # Si NO existe (estas en Cloud Run), usa las credenciales automáticas de la nube
+        firebase_admin.initialize_app()
 
 db_firestore = firestore.client(database_id="alertas-agrosmart")
 

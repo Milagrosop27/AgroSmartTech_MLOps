@@ -4,3 +4,4 @@ models/*.pkl
 __pycache__/
 data/
 node_modules
+backend/firebase-credenciales.json
