@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, Fragment } from 'react';
 import { CheckCircle, Send, Clock, Filter, X, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const traducirRiesgo = (diagnostico) => {
@@ -99,7 +99,7 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
   const [filtroLote, setFiltroLote] = useState('todos');
   const [filtroDiagnostico, setFiltroDiagnostico] = useState('todos');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  const [paginaActual, setPaginaActual] = useState(1); // ✅ paginado
+  const [paginaActual, setPaginaActual] = useState(1);
 
   const hectareasUnicas = useMemo(() => {
     const hectareas = historialAlertas.map(a => a.lote?.split('_')[0]).filter(Boolean);
@@ -157,7 +157,6 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
     });
   }, [historialAlertas, filtroFecha, fechaExacta, filtroEstado, filtroLote, filtroDiagnostico]);
 
-  // ✅ Paginado
   const totalPaginas = Math.ceil(alertasFiltradas.length / ALERTAS_POR_PAGINA);
   const alertasPagina = alertasFiltradas.slice(
     (paginaActual - 1) * ALERTAS_POR_PAGINA,
@@ -172,13 +171,13 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
     setFiltroEstado('todos');
     setFiltroLote('todos');
     setFiltroDiagnostico('todos');
-    setPaginaActual(1); // ✅ resetear página al limpiar
+    setPaginaActual(1);
   };
 
   const seleccionarPill = (valor) => {
     setFiltroFecha(valor);
     setFechaExacta(null);
-    setPaginaActual(1); // ✅ resetear página al filtrar
+    setPaginaActual(1);
   };
 
   return (
@@ -377,7 +376,7 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
           </table>
         </div>
 
-        {/* Paginado */}
+        {/* Paginado Truncado */}
         {totalPaginas > 1 && (
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
             <p className="text-xs text-gray-400">
@@ -392,19 +391,25 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                 <ChevronLeft size={14} className="text-gray-600" />
               </button>
 
-              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(num => (
-                <button
-                  key={num}
-                  onClick={() => setPaginaActual(num)}
-                  className={`w-8 h-8 rounded-lg text-xs font-semibold border transition-colors ${
-                    paginaActual === num
-                      ? 'bg-green-600 text-white border-green-600'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {num}
-                </button>
-              ))}
+              {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                .filter(num => num === 1 || num === totalPaginas || (num >= paginaActual - 1 && num <= paginaActual + 1))
+                .map((num, i, arr) => (
+                  <Fragment key={num}>
+                    {i > 0 && arr[i - 1] !== num - 1 && (
+                      <span className="px-2 text-gray-400">...</span>
+                    )}
+                    <button
+                      onClick={() => setPaginaActual(num)}
+                      className={`w-8 h-8 rounded-lg text-xs font-semibold border transition-colors ${
+                        paginaActual === num
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  </Fragment>
+                ))}
 
               <button
                 onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
