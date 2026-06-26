@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { CheckCircle, Send, Clock, Filter, X, Calendar } from 'lucide-react';
+import { CheckCircle, Send, Clock, Filter, X, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const traducirRiesgo = (diagnostico) => {
   switch (diagnostico) {
@@ -46,23 +46,16 @@ const MiniCalendario = ({ fechaSeleccionada, onSeleccionar, onCerrar }) => {
 
   return (
     <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 w-72">
-      {/* Navegación mes */}
       <div className="flex justify-between items-center mb-3">
         <button onClick={mesAnterior} className="p-1 rounded-lg hover:bg-gray-100 text-gray-600 font-bold">‹</button>
-        <span className="text-sm font-bold text-gray-800">
-          {meses[mesVista.getMonth()]} {mesVista.getFullYear()}
-        </span>
+        <span className="text-sm font-bold text-gray-800">{meses[mesVista.getMonth()]} {mesVista.getFullYear()}</span>
         <button onClick={mesSiguiente} className="p-1 rounded-lg hover:bg-gray-100 text-gray-600 font-bold">›</button>
       </div>
-
-      {/* Días de la semana */}
       <div className="grid grid-cols-7 mb-1">
         {diasSemana.map(d => (
           <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1">{d}</div>
         ))}
       </div>
-
-      {/* Días del mes */}
       <div className="grid grid-cols-7 gap-0.5">
         {celdas.map((dia, i) => {
           if (!dia) return <div key={`empty-${i}`} />;
@@ -74,11 +67,9 @@ const MiniCalendario = ({ fechaSeleccionada, onSeleccionar, onCerrar }) => {
               key={dia}
               onClick={() => { onSeleccionar(fechaStr); onCerrar(); }}
               className={`text-xs rounded-lg py-1.5 font-medium transition-colors ${
-                esSeleccionado
-                  ? 'bg-green-600 text-white'
-                  : esHoy
-                  ? 'bg-green-50 text-green-700 font-bold'
-                  : 'hover:bg-gray-100 text-gray-700'
+                esSeleccionado ? 'bg-green-600 text-white' :
+                esHoy ? 'bg-green-50 text-green-700 font-bold' :
+                'hover:bg-gray-100 text-gray-700'
               }`}
             >
               {dia}
@@ -86,8 +77,6 @@ const MiniCalendario = ({ fechaSeleccionada, onSeleccionar, onCerrar }) => {
           );
         })}
       </div>
-
-      {/* Botón limpiar */}
       {fechaSeleccionada && (
         <button
           onClick={() => { onSeleccionar(null); onCerrar(); }}
@@ -100,6 +89,8 @@ const MiniCalendario = ({ fechaSeleccionada, onSeleccionar, onCerrar }) => {
   );
 };
 
+const ALERTAS_POR_PAGINA = 10;
+
 const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) => {
   const [filtroFecha, setFiltroFecha] = useState('todos');
   const [fechaExacta, setFechaExacta] = useState(null);
@@ -108,24 +99,20 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
   const [filtroLote, setFiltroLote] = useState('todos');
   const [filtroDiagnostico, setFiltroDiagnostico] = useState('todos');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [paginaActual, setPaginaActual] = useState(1); // ✅ paginado
 
   const hectareasUnicas = useMemo(() => {
-  const hectareas = historialAlertas
-    .map(a => a.lote?.split('_')[0])
-    .filter(Boolean);
-  return [...new Set(hectareas)].sort();
-}, [historialAlertas]);
+    const hectareas = historialAlertas.map(a => a.lote?.split('_')[0]).filter(Boolean);
+    return [...new Set(hectareas)].sort();
+  }, [historialAlertas]);
 
   const alertasFiltradas = useMemo(() => {
     const ahora = new Date();
-
     return historialAlertas.filter(alerta => {
-      // Usar fechaISO si existe, sino intentar parsear fecha
       let fechaAlerta;
       if (alerta.fechaISO) {
         fechaAlerta = new Date(alerta.fechaISO);
       } else if (alerta.fecha) {
-        // Intenta parsear "17/6/2026, 10:53:36 p.m." → "2026/6/17 10:53:36 PM"
         const partes = String(alerta.fecha).match(
           /(\d+)\/(\d+)\/(\d+),?\s+(\d+):(\d+):(\d+)\s*(a\.m\.|p\.m\.)/i
         );
@@ -146,22 +133,19 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
         const yyyy = fechaAlerta.getFullYear();
         const mm = String(fechaAlerta.getMonth() + 1).padStart(2, '0');
         const dd = String(fechaAlerta.getDate()).padStart(2, '0');
-        const fechaStr = `${yyyy}-${mm}-${dd}`;
-        if (fechaStr !== fechaExacta) return false;
+        if (`${yyyy}-${mm}-${dd}` !== fechaExacta) return false;
       } else if (filtroFecha !== 'todos') {
         if (filtroFecha === 'hoy') {
           if (fechaAlerta.toDateString() !== ahora.toDateString()) return false;
         } else if (filtroFecha === 'semana') {
           const inicioSemana = new Date(ahora);
-          const diaSemana = ahora.getDay() === 0 ? 6 : ahora.getDay() - 1; // lunes = 0
+          const diaSemana = ahora.getDay() === 0 ? 6 : ahora.getDay() - 1;
           inicioSemana.setDate(ahora.getDate() - diaSemana);
           inicioSemana.setHours(0, 0, 0, 0);
           if (fechaAlerta < inicioSemana) return false;
         } else if (filtroFecha === 'mes') {
-          if (
-            fechaAlerta.getMonth() !== ahora.getMonth() ||
-            fechaAlerta.getFullYear() !== ahora.getFullYear()
-          ) return false;
+          if (fechaAlerta.getMonth() !== ahora.getMonth() ||
+              fechaAlerta.getFullYear() !== ahora.getFullYear()) return false;
         }
       }
 
@@ -172,6 +156,14 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
       return true;
     });
   }, [historialAlertas, filtroFecha, fechaExacta, filtroEstado, filtroLote, filtroDiagnostico]);
+
+  // ✅ Paginado
+  const totalPaginas = Math.ceil(alertasFiltradas.length / ALERTAS_POR_PAGINA);
+  const alertasPagina = alertasFiltradas.slice(
+    (paginaActual - 1) * ALERTAS_POR_PAGINA,
+    paginaActual * ALERTAS_POR_PAGINA
+  );
+
   const hayFiltrosActivos = filtroFecha !== 'todos' || fechaExacta || filtroEstado !== 'todos' || filtroLote !== 'todos' || filtroDiagnostico !== 'todos';
 
   const limpiarFiltros = () => {
@@ -180,11 +172,13 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
     setFiltroEstado('todos');
     setFiltroLote('todos');
     setFiltroDiagnostico('todos');
+    setPaginaActual(1); // ✅ resetear página al limpiar
   };
 
   const seleccionarPill = (valor) => {
     setFiltroFecha(valor);
-    setFechaExacta(null); // limpiar fecha exacta al usar pill
+    setFechaExacta(null);
+    setPaginaActual(1); // ✅ resetear página al filtrar
   };
 
   return (
@@ -230,14 +224,9 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
         {/* Panel de filtros */}
         {mostrarFiltros && (
           <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 space-y-4">
-
-            {/* Filtro fecha — pills + calendario */}
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
-                Fecha
-              </label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Fecha</label>
               <div className="flex flex-wrap items-center gap-2">
-                {/* Pills rápidos */}
                 {[
                   { label: 'Todas', valor: 'todos' },
                   { label: 'Hoy', valor: 'hoy' },
@@ -256,8 +245,6 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                     {label}
                   </button>
                 ))}
-
-                {/* Botón calendario */}
                 <div className="relative">
                   <button
                     onClick={() => setMostrarCalendario(!mostrarCalendario)}
@@ -270,11 +257,10 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                     <Calendar size={12} />
                     {fechaExacta ? fechaExacta : 'Fecha exacta'}
                   </button>
-
                   {mostrarCalendario && (
                     <MiniCalendario
                       fechaSeleccionada={fechaExacta}
-                      onSeleccionar={(f) => { setFechaExacta(f); if (f) setFiltroFecha('todos'); }}
+                      onSeleccionar={(f) => { setFechaExacta(f); if (f) { setFiltroFecha('todos'); setPaginaActual(1); } }}
                       onCerrar={() => setMostrarCalendario(false)}
                     />
                   )}
@@ -282,13 +268,12 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
               </div>
             </div>
 
-            {/* Filtros estado, lote, diagnóstico */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Estado</label>
                 <select
                   value={filtroEstado}
-                  onChange={e => setFiltroEstado(e.target.value)}
+                  onChange={e => { setFiltroEstado(e.target.value); setPaginaActual(1); }}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
                 >
                   <option value="todos">Todos</option>
@@ -296,12 +281,11 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                   <option value="TIMEOUT">Sin respuesta</option>
                 </select>
               </div>
-
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Lote</label>
                 <select
                   value={filtroLote}
-                  onChange={e => setFiltroLote(e.target.value)}
+                  onChange={e => { setFiltroLote(e.target.value); setPaginaActual(1); }}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
                 >
                   <option value="todos">Todos</option>
@@ -310,12 +294,11 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Diagnóstico</label>
                 <select
                   value={filtroDiagnostico}
-                  onChange={e => setFiltroDiagnostico(e.target.value)}
+                  onChange={e => { setFiltroDiagnostico(e.target.value); setPaginaActual(1); }}
                   className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white focus:outline-none focus:border-green-400"
                 >
                   <option value="todos">Todos</option>
@@ -325,7 +308,6 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                 </select>
               </div>
             </div>
-
           </div>
         )}
 
@@ -342,7 +324,7 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {alertasFiltradas.map((alerta) => (
+              {alertasPagina.map((alerta) => (
                 <tr
                   key={alerta.id}
                   className="hover:bg-gray-50 transition-colors"
@@ -357,36 +339,27 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
                   </td>
                   <td className="px-6 py-4">{alerta.recomendacion}</td>
                   <td className="px-6 py-4 flex justify-end">
-
                     {alerta.estado === 'PENDING' && (
                       <span className="flex items-center gap-1 text-yellow-600 text-xs font-semibold px-3 py-1 bg-yellow-50 rounded-md border border-yellow-200">
                         <Clock size={14} className="animate-spin" /> Esperando...
                       </span>
                     )}
-
                     {alerta.estado === 'TIMEOUT' && (
                       <button
                         onClick={() => manejarAprobacionAlerta(
-                          {
-                            farm_id: alerta.lote,
-                            crop_disease_status: alerta.diagnostico,
-                            crop_type: alerta.cultivo
-                          },
+                          { farm_id: alerta.lote, crop_disease_status: alerta.diagnostico, crop_type: alerta.cultivo },
                           alerta.telefono
                         )}
                         className="flex items-center gap-1 text-white bg-amber-600 border border-amber-700 hover:bg-amber-700 px-3 py-1 rounded-md text-sm font-semibold transition-colors"
                       >
-                        <Send size={14} />
-                        Reenviar
+                        <Send size={14} /> Reenviar
                       </button>
                     )}
-
                     {alerta.estado === 'SUCCESS' && (
                       <span className="flex items-center gap-1 text-emerald-600 text-sm font-bold">
                         <CheckCircle size={16} /> Realizado
                       </span>
                     )}
-
                   </td>
                 </tr>
               ))}
@@ -403,6 +376,47 @@ const Alerts = ({ historialAlertas, manejarAprobacionAlerta, confirmarAlerta }) 
             </tbody>
           </table>
         </div>
+
+        {/* Paginado */}
+        {totalPaginas > 1 && (
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-gray-400">
+              Mostrando {(paginaActual - 1) * ALERTAS_POR_PAGINA + 1}–{Math.min(paginaActual * ALERTAS_POR_PAGINA, alertasFiltradas.length)} de {alertasFiltradas.length} alertas
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                disabled={paginaActual === 1}
+                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={14} className="text-gray-600" />
+              </button>
+
+              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(num => (
+                <button
+                  key={num}
+                  onClick={() => setPaginaActual(num)}
+                  className={`w-8 h-8 rounded-lg text-xs font-semibold border transition-colors ${
+                    paginaActual === num
+                      ? 'bg-green-600 text-white border-green-600'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+
+              <button
+                onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+                disabled={paginaActual === totalPaginas}
+                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={14} className="text-gray-600" />
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
