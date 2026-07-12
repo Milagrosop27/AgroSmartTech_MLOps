@@ -644,4 +644,4 @@ La estructura del proyecto permite evolucionar desde una fase académica hacia u
 
 ## 21. Autores
 
-Proyecto desarrollado con fines académicos para la asignatura de **Desarrollo de Aplicaciones con DevOps**.
+Proyecto desarrollado con fines académicos.
