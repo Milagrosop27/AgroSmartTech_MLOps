@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 const Mapa = () => {
   const [ndviImage, setNdviImage] = useState(null);
 
-  // 1. Tus coordenadas reales extraídas del KML de Google Earth
+  // Coordenadas reales extraídas del KML de Google Earth
   const coordenadasParcela = [
     [-13.04305294324663, -76.31179100658558],
     [-13.04582890386070, -76.31107067491148],
