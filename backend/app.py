@@ -18,6 +18,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 from sentinelhub import SentinelHubRequest, MimeType, CRS, SHConfig, BBox, DataCollection
+from PIL import Image
 
 if not firebase_admin._apps:
     RUTA_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "firebase-credenciales.json")
@@ -593,7 +594,7 @@ def obtener_ndvi():
             "status": "success"
         })
 
-    
+
     except Exception as e:
         logging.error(f"Error procesando SentinelHub: {e}")
         return jsonify({"error": str(e)}), 500
