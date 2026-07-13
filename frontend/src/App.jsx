@@ -12,6 +12,7 @@ import Overview from './views/overview.jsx';
 import Analitica from './views/analitica.jsx';
 import Alerts from './views/alerts.jsx';
 import Simulador from './views/simulador.jsx';
+import Mapa from './views/mapa.jsx';
 
 import MainLayout from './layouts/MainLayout';
 import AppContext from './context/AppContext';
@@ -31,7 +32,6 @@ function App() {
   const [hectareaSeleccionada, setHectareaSeleccionada] = useState(null);
   const [zonas, setZonas] = useState({ hectareas: [], sectores_por_hectarea: {} });
 
-
   const mostrarNotificacion = (mensaje, tipo = 'success') => {
     setNotificacion({ mostrar: true, mensaje, tipo });
     setTimeout(() => setNotificacion({ mostrar: false, mensaje: '', tipo: '' }), 4000);
@@ -46,11 +46,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-  // Solo guarda si realmente hay alertas cargadas, evitando borrar el storage en el boot inicial
-  if (historialAlertas && historialAlertas.length > 0) {
-    localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
-  }
-}, [historialAlertas]);
+    if (historialAlertas && historialAlertas.length > 0) {
+      localStorage.setItem('agro_history_v1', JSON.stringify(historialAlertas));
+    }
+  }, [historialAlertas]);
 
   useEffect(() => {
     if (!usuario) return;
@@ -270,6 +269,8 @@ function App() {
             <Route path="alertas" element={<Alerts manejarAprobacionAlerta={manejarAprobacionAlerta} />} />
             <Route path="record" element={<Record historialAlertas={historialAlertas} />} />
             <Route path="simulador" element={<Simulador />} />
+            <Route path="mapa" element={<Mapa />} />
+
             <Route path="*" element={<div className="p-10 text-center"><h2 className="text-3xl font-bold text-red-500 mb-4">Ruta no encontrada</h2></div>} />
           </Route>
         </Routes>
