@@ -12,6 +12,12 @@ import os
 import time
 import firebase_admin
 from firebase_admin import credentials, firestore
+import io
+import base64
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+from sentinelhub import SentinelHubRequest, MimeType, CRS, SHConfig, BBox, DataCollection
 
 if not firebase_admin._apps:
     RUTA_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "firebase-credenciales.json")
@@ -524,6 +530,63 @@ def obtener_agricultores():
     except Exception as e:
         logging.error(f"Error en /api/agricultores: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/satelite/ndvi', methods=['POST'])
+def obtener_ndvi():
+    # 1. Recibir coordenadas del frontend
+    datos = request.json
+    bbox_coords = datos.get('bbox')  # Ej: [lon_min, lat_min, lon_max, lat_max]
+
+    if not bbox_coords or len(bbox_coords) != 4:
+        return jsonify({"error": "Faltan coordenadas o formato incorrecto"}), 400
+
+    # SOLUCIÓN CRÍTICA: Envolver la lista en un objeto BBox y definir el sistema de coordenadas
+    bbox_obj = BBox(bbox=bbox_coords, crs=CRS.WGS84)
+
+    # 2. Configurar llaves de Sentinel
+    config = SHConfig()
+    config.sh_client_id = os.environ.get('SENTINEL_CLIENT_ID')
+    config.sh_client_secret = os.environ.get('SENTINEL_CLIENT_SECRET')
+
+    # 3. Pedir los datos a Sentinel (Script NDVI)
+    evalscript = """
+    //VERSION=3
+    function setup() {
+      return { input: ["B04", "B08"], output: { bands: 1 } };
+    }
+    function evaluatePixel(sample) {
+      return [(sample.B08 - sample.B04) / (sample.B08 + sample.B04)];
+    }
+    """
+
+    try:
+        # Configurar la petición
+        peticion = SentinelHubRequest(
+            evalscript=evalscript,
+            input_data=[SentinelHubRequest.input_data(
+                data_collection=DataCollection.SENTINEL2_L2A,  # Se usa la constante oficial
+                time_interval=(datetime.datetime.now() - datetime.timedelta(days=30), datetime.datetime.now())
+            )],
+            bbox=bbox_obj,  # Se usa el objeto convertido, no la lista
+            size=[512, 512],
+            config=config
+        )
+
+        data = peticion.get_data()[0]
+        ndvi_promedio = float(np.mean(data))
+
+        return jsonify({
+            "ndvi_promedio": round(ndvi_promedio, 4),  # Redondeado para mejor lectura
+            "status": "success"
+        })
+
+    except Exception as e:
+        logging.error(f"Error procesando SentinelHub: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+    
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)

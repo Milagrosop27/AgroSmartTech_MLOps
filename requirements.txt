@@ -10,3 +10,5 @@ requests==2.33.1
 twilio==8.1.0
 google-cloud-bigquery
 firebase-admin
+sentinelhub
+matplotlib

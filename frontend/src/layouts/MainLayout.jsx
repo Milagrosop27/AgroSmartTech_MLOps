@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FlaskConical, TrendingUp, Sprout, BellRing, ClipboardList, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
+import { LayoutDashboard, FlaskConical, TrendingUp, Sprout, BellRing, ClipboardList, ChevronDown, ChevronUp, LogOut, Map } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { signOut } from 'firebase/auth';
 
@@ -21,9 +21,7 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-      {/* SIDEBAR FLOTANTE Y RESPONSIVO
-        onMouseEnter y onMouseLeave controlan la expansión automática
-      */}
+      {/* SIDEBAR FLOTANTE Y RESPONSIVO */}
       <aside
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -84,6 +82,25 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
               </span>
             </NavLink>
 
+            {/* Botón del Mapa Satelital */}
+            <NavLink
+              to="/mapa"
+              className={({ isActive }) =>
+                `flex items-center rounded-xl transition-all duration-200 ${
+                  isHovered ? 'px-4 py-3 gap-3' : 'justify-center py-3'
+                } ${
+                  isActive
+                    ? 'bg-white shadow-sm font-bold text-agro-900 border border-gray-100'
+                    : 'bg-transparent text-agro-800 hover:bg-gray-200/50'
+                }`
+              }
+            >
+              <Map size={22} className="shrink-0" />
+              <span className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${isHovered ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>
+                Satélite
+              </span>
+            </NavLink>
+
             {/* SECCIÓN ALERTAS (CON DESPLEGABLE) */}
             <div className="flex flex-col">
               <div className="flex items-center relative">
@@ -107,7 +124,6 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
                   </div>
                 </NavLink>
 
-                {/* Solo mostramos la flecha si el menú está expandido */}
                 {isHovered && (
                   <button className="absolute right-4 p-1 text-agro-500 transition-colors cursor-default">
                     {menuAlertasAbierto ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -115,7 +131,6 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
                 )}
               </div>
 
-              {/* Solo mostramos los sub-ítems si está abierto Y el sidebar está expandido */}
               {menuAlertasAbierto && isHovered && (
                 <div className="ml-6 mt-1 pl-4 border-l-2 border-green-200 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2">
                   <NavLink
@@ -160,11 +175,6 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
         </div>
       </aside>
 
-      {/* CONTENIDO PRINCIPAL
-        Tiene un margen izquierdo fijo de ml-28 (112px) para dejar espacio
-        al sidebar colapsado, permitiendo que el sidebar se expanda por encima
-        sin empujar la pantalla abruptamente.
-      */}
       <main className={`flex-1 p-8 min-h-screen transition-all duration-300 ease-in-out ${isHovered ? 'ml-[280px]' : 'ml-[100px]'}`}>
         <Outlet />
       </main>

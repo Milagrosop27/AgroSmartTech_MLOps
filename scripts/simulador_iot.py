@@ -10,6 +10,7 @@ Cambios respecto a la versión anterior:
   - Ciclo cada 60 segundos.
 """
 
+
 import numpy as np
 import pandas as pd
 from pathlib import Path
