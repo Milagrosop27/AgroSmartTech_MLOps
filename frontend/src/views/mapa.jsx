@@ -78,15 +78,12 @@ const Mapa = () => {
       <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 rounded">
         <h3 className="text-lg font-bold text-green-900">Salud del Cultivo (NDVI Sentinel-2)</h3>
         {loading ? (
-          <p className="text-gray-600">📡 Conectando con satélite y calculando...</p>
+          <p className="text-gray-600">📡 Conectando con satélite </p>
         ) : error ? (
-          <p className="text-red-600">❌ Error: {error}</p>
+          <p className="text-red-600">  Error: {error}</p>
         ) : (
           <p className="text-xl font-semibold text-green-700">
             Índice Promedio: {ndviPromedio}
-            <span className="text-sm font-normal text-gray-700 ml-2">
-              ({ndviPromedio >= 0.5 ? 'Óptimo 🌿' : 'Requiere Atención ⚠️'})
-            </span>
           </p>
         )}
       </div>

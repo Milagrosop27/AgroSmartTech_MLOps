@@ -547,26 +547,26 @@ def obtener_ndvi():
     config.sh_client_id = os.environ.get('SENTINEL_CLIENT_ID')
     config.sh_client_secret = os.environ.get('SENTINEL_CLIENT_SECRET')
 
-    # ESTE ES EL SCRIPT QUE FALTABA: Define 4 bandas (RGBA) y asigna colores
-    evalscript = """
-    //VERSION=3
-    function setup() {
-      return { input: ["B04", "B08"], output: { bands: 4, sampleType: "AUTO" } };
-    }
-    function evaluatePixel(sample) {
-      let ndvi = (sample.B08 - sample.B04) / (sample.B08 + sample.B04);
-
-      if (ndvi < 0.2) return [1, 0, 0, 0.7];       // Rojo (Malo)
-      else if (ndvi < 0.4) return [1, 1, 0, 0.7];  // Amarillo (Regular)
-      else if (ndvi < 0.6) return [0.5, 1, 0, 0.7];// Verde claro (Bueno)
-      else return [0, 0.5, 0, 0.7];                // Verde oscuro (Excelente)
-    }
-    """
-
     try:
-        # Petición oficial a Sentinel Hub
-        peticion = SentinelHubRequest(
-            evalscript=evalscript,
+        # ==========================================
+        # PARTE 1: OBTENER LA IMAGEN COLOREADA (RGBA)
+        # ==========================================
+        evalscript_img = """
+        //VERSION=3
+        function setup() {
+          return { input: ["B04", "B08"], output: { bands: 4, sampleType: "AUTO" } };
+        }
+        function evaluatePixel(sample) {
+          let ndvi = (sample.B08 - sample.B04) / (sample.B08 + sample.B04);
+          if (ndvi < 0.2) return [1, 0, 0, 0.7];       // Rojo (Malo)
+          else if (ndvi < 0.4) return [1, 1, 0, 0.7];  // Amarillo (Regular)
+          else if (ndvi < 0.6) return [0.5, 1, 0, 0.7];// Verde claro (Bueno)
+          else return [0, 0.5, 0, 0.7];                // Verde oscuro (Excelente)
+        }
+        """
+
+        peticion_img = SentinelHubRequest(
+            evalscript=evalscript_img,
             input_data=[SentinelHubRequest.input_data(
                 data_collection=DataCollection.SENTINEL2_L2A,
                 time_interval=(datetime.datetime.now() - datetime.timedelta(days=30), datetime.datetime.now())
@@ -577,28 +577,57 @@ def obtener_ndvi():
             config=config
         )
 
-        data = peticion.get_data()[0]
-
-        # Forzar la matriz a formato entero de 8 bits (requerido por Pillow)
-        imagen_matriz = np.array(data, dtype=np.uint8)
+        data_img = peticion_img.get_data()[0]
+        imagen_matriz = np.array(data_img, dtype=np.uint8)
         img = Image.fromarray(imagen_matriz, 'RGBA')
 
-        # Empaquetado final para la web
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
         img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-
         url_imagen = f"data:image/png;base64,{img_base64}"
 
+        # ==========================================
+        # PARTE 2: OBTENER EL NÚMERO EXACTO (PROMEDIO)
+        # ==========================================
+        evalscript_num = """
+        //VERSION=3
+        function setup() {
+          return { input: ["B04", "B08"], output: { bands: 1 } };
+        }
+        function evaluatePixel(sample) {
+          return [(sample.B08 - sample.B04) / (sample.B08 + sample.B04)];
+        }
+        """
+
+        peticion_num = SentinelHubRequest(
+            evalscript=evalscript_num,
+            input_data=[SentinelHubRequest.input_data(
+                data_collection=DataCollection.SENTINEL2_L2A,
+                time_interval=(datetime.datetime.now() - datetime.timedelta(days=30), datetime.datetime.now())
+            )],
+            responses=[SentinelHubRequest.output_response('default', MimeType.TIFF)],
+            bbox=bbox_obj,
+            size=[512, 512],
+            config=config
+        )
+
+        data_num = peticion_num.get_data()[0]
+        ndvi_promedio = float(np.mean(data_num))
+
+        # ==========================================
+        # PARTE 3: ENVIAR AMBOS DATOS A REACT
+        # ==========================================
         return jsonify({
             "url_imagen_ndvi": url_imagen,
+            "ndvi_promedio": round(ndvi_promedio, 4),
             "status": "success"
         })
 
     except Exception as e:
         logging.error(f"Error procesando SentinelHub: {e}")
         return jsonify({"error": str(e)}), 500
-    
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
