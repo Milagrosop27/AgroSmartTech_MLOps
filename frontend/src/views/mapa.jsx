@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Polygon, ImageOverlay } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const Mapa = () => {
-  const [ndviImage, setNdviImage] = useState(null);
+  const [ndviPromedio, setNdviPromedio] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Coordenadas reales extraídas del KML de Google Earth
+  // Coordenadas reales extraídas del KML
   const coordenadasParcela = [
     [-13.04305294324663, -76.31179100658558],
     [-13.04582890386070, -76.31107067491148],
@@ -21,55 +23,81 @@ const Mapa = () => {
     [-13.04305294324663, -76.31179100658558]
   ];
 
-  // 2. Límites extremos de tu fundo (Suroeste y Noreste)
-  // Esto servirá para encuadrar la cámara y luego para pegar la foto del satélite
+  // Límites extremos de tu fundo
   const bounds = [
-    [-13.04860255740165, -76.31179100658558], // Esquina Suroeste
-    [-13.04030400066042, -76.29922166366896]  // Esquina Noreste
+    [-13.04860255740165, -76.31179100658558], // Esquina Suroeste (min_lat, min_lon)
+    [-13.04030400066042, -76.29922166366896]  // Esquina Noreste (max_lat, max_lon)
+  ];
+
+  // El BBox exacto que espera Sentinel: [min_lon, min_lat, max_lon, max_lat]
+  const bboxParaSentinel = [
+    -76.31179100658558, // min_lon
+    -13.04860255740165, // min_lat
+    -76.29922166366896, // max_lon
+    -13.04030400066042  // max_lat
   ];
 
   useEffect(() => {
-    // Aquí haremos la petición al backend de Flask en el próximo paso
-
     const obtenerMapaNDVI = async () => {
       try {
-        const response = await fetch('URL_DE_TU_API/api/satelite/ndvi');
+        // ⚠️ Asegúrate de poner aquí la URL de tu Cloud Run
+        const apiUrl = 'https://agrosmart-api-940420015515.us-central1.run.app/api/satelite/ndvi';
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bbox: bboxParaSentinel })
+        });
+
         const data = await response.json();
-        setNdviImage(data.url_imagen_ndvi);
+
+        if (data.status === 'success') {
+          setNdviPromedio(data.ndvi_promedio);
+        } else {
+          setError(data.error);
+        }
       } catch (error) {
         console.error("Error obteniendo datos satelitales", error);
+        setError("Error de red al conectar con el servidor.");
+      } finally {
+        setLoading(false);
       }
     };
+
     obtenerMapaNDVI();
-  }, []);
+  }, []); // Se ejecuta solo una vez al cargar el componente
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-2 text-green-800">Monitoreo Satelital de Fundo</h1>
       <p className="text-gray-600 mb-4">
-        Visualización del Índice de Vegetación (NDVI) para el área seleccionada (~12 km²).
+        Visualización del área seleccionada (~12 km²) en San Vicente de Cañete.
       </p>
 
-      <div className="border-4 border-green-600 rounded-lg overflow-hidden shadow-lg">
-        {/* Usamos 'bounds' directamente. Leaflet calculará el centro y el zoom ideal
-          automáticamente para que tu polígono encaje perfecto en la pantalla.
-        */}
-        <MapContainer bounds={bounds} style={{ height: '600px', width: '100%' }}>
+      {/* Tarjeta de Resultados NDVI */}
+      <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 rounded">
+        <h3 className="text-lg font-bold text-green-900">Salud del Cultivo (NDVI Sentinel-2)</h3>
+        {loading ? (
+          <p className="text-gray-600">📡 Conectando con satélite y calculando...</p>
+        ) : error ? (
+          <p className="text-red-600">❌ Error: {error}</p>
+        ) : (
+          <p className="text-xl font-semibold text-green-700">
+            Índice Promedio: {ndviPromedio}
+            <span className="text-sm font-normal text-gray-700 ml-2">
+              ({ndviPromedio >= 0.5 ? 'Óptimo 🌿' : 'Requiere Atención ⚠️'})
+            </span>
+          </p>
+        )}
+      </div>
 
+      <div className="border-4 border-green-600 rounded-lg overflow-hidden shadow-lg">
+        <MapContainer bounds={bounds} style={{ height: '600px', width: '100%' }}>
           <TileLayer
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            attribution='Tiles &copy; Esri &mdash; Source: Esri'
+            attribution='Tiles &copy; Esri'
           />
-
           <Polygon positions={coordenadasParcela} color="#00FF00" weight={3} fillOpacity={0.1} />
-
-          {ndviImage && (
-            <ImageOverlay
-              url={ndviImage}
-              bounds={bounds}
-              opacity={0.7}
-            />
-          )}
         </MapContainer>
       </div>
     </div>

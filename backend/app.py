@@ -568,19 +568,32 @@ def obtener_ndvi():
                 data_collection=DataCollection.SENTINEL2_L2A,  # Se usa la constante oficial
                 time_interval=(datetime.datetime.now() - datetime.timedelta(days=30), datetime.datetime.now())
             )],
-            bbox=bbox_obj,  # Se usa el objeto convertido, no la lista
+            responses=[SentinelHubRequest.output_response('default', MimeType.PNG)],
+            bbox=bbox_obj,
             size=[512, 512],
             config=config
+
         )
 
+        # 1. Obtener los datos (Sentinel ya nos devuelve la matriz lista para imagen)
         data = peticion.get_data()[0]
-        ndvi_promedio = float(np.mean(data))
+
+        # 2. Convertir los datos a una imagen
+        img = Image.fromarray(data, 'RGBA')
+
+        # 3. Empaquetarla en Base64 para enviarla a React
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+        url_imagen = f"data:image/png;base64,{img_base64}"
 
         return jsonify({
-            "ndvi_promedio": round(ndvi_promedio, 4),  # Redondeado para mejor lectura
+            "url_imagen_ndvi": url_imagen,
             "status": "success"
         })
 
+    
     except Exception as e:
         logging.error(f"Error procesando SentinelHub: {e}")
         return jsonify({"error": str(e)}), 500
