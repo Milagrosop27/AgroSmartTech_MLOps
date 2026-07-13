@@ -535,54 +535,55 @@ def obtener_agricultores():
 
 @app.route('/api/satelite/ndvi', methods=['POST'])
 def obtener_ndvi():
-    # 1. Recibir coordenadas del frontend
     datos = request.json
-    bbox_coords = datos.get('bbox')  # Ej: [lon_min, lat_min, lon_max, lat_max]
+    bbox_coords = datos.get('bbox')
 
     if not bbox_coords or len(bbox_coords) != 4:
         return jsonify({"error": "Faltan coordenadas o formato incorrecto"}), 400
 
-    # SOLUCIÓN CRÍTICA: Envolver la lista en un objeto BBox y definir el sistema de coordenadas
     bbox_obj = BBox(bbox=bbox_coords, crs=CRS.WGS84)
 
-    # 2. Configurar llaves de Sentinel
     config = SHConfig()
     config.sh_client_id = os.environ.get('SENTINEL_CLIENT_ID')
     config.sh_client_secret = os.environ.get('SENTINEL_CLIENT_SECRET')
 
-    # 3. Pedir los datos a Sentinel (Script NDVI)
+    # ESTE ES EL SCRIPT QUE FALTABA: Define 4 bandas (RGBA) y asigna colores
     evalscript = """
     //VERSION=3
     function setup() {
-      return { input: ["B04", "B08"], output: { bands: 1 } };
+      return { input: ["B04", "B08"], output: { bands: 4, sampleType: "AUTO" } };
     }
     function evaluatePixel(sample) {
-      return [(sample.B08 - sample.B04) / (sample.B08 + sample.B04)];
+      let ndvi = (sample.B08 - sample.B04) / (sample.B08 + sample.B04);
+
+      if (ndvi < 0.2) return [1, 0, 0, 0.7];       // Rojo (Malo)
+      else if (ndvi < 0.4) return [1, 1, 0, 0.7];  // Amarillo (Regular)
+      else if (ndvi < 0.6) return [0.5, 1, 0, 0.7];// Verde claro (Bueno)
+      else return [0, 0.5, 0, 0.7];                // Verde oscuro (Excelente)
     }
     """
 
     try:
-        # Configurar la petición
+        # Petición oficial a Sentinel Hub
         peticion = SentinelHubRequest(
             evalscript=evalscript,
             input_data=[SentinelHubRequest.input_data(
-                data_collection=DataCollection.SENTINEL2_L2A,  # Se usa la constante oficial
+                data_collection=DataCollection.SENTINEL2_L2A,
                 time_interval=(datetime.datetime.now() - datetime.timedelta(days=30), datetime.datetime.now())
             )],
             responses=[SentinelHubRequest.output_response('default', MimeType.PNG)],
             bbox=bbox_obj,
             size=[512, 512],
             config=config
-
         )
 
-        # 1. Obtener los datos (Sentinel ya nos devuelve la matriz lista para imagen)
         data = peticion.get_data()[0]
 
-        # 2. Convertir los datos a una imagen
-        img = Image.fromarray(data, 'RGBA')
+        # Forzar la matriz a formato entero de 8 bits (requerido por Pillow)
+        imagen_matriz = np.array(data, dtype=np.uint8)
+        img = Image.fromarray(imagen_matriz, 'RGBA')
 
-        # 3. Empaquetarla en Base64 para enviarla a React
+        # Empaquetado final para la web
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
         img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
@@ -594,12 +595,9 @@ def obtener_ndvi():
             "status": "success"
         })
 
-
     except Exception as e:
         logging.error(f"Error procesando SentinelHub: {e}")
         return jsonify({"error": str(e)}), 500
-
-
     
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
