@@ -28,49 +28,44 @@ const Simulador = () => {
     }));
   };
 
-  const ejecutarSimulacion = (e) => {
+  const ejecutarSimulacion = async (e) => {
     e.preventDefault();
     setCargando(true);
     setError('');
     setResultado(null);
 
-    // Entorno Sandbox Aislado: No hay fetch, no hay API, no hay guardado en BD.
-    setTimeout(() => {
-      try {
-        const temp = formulario.temperature_C;
-        const hum = formulario['humidity_%'];
-        const ph = formulario.soil_pH;
-        const ndvi = formulario.NDVI_index;
-        const cultivo = formulario.crop_type;
+    try {
+      // 1. Definimos la URL de tu API
+      const API_URL = 'https://agrosmart-api-940420015515.us-central1.run.app';
 
-        let riesgoPredictivo = 'Healthy';
-        let recomendacionSugerida = `Condiciones óptimas para el cultivo de ${cultivo}. Mantener el régimen actual de monitoreo.`;
+      // 2. Hacemos la petición a la nueva ruta "sandbox" que creamos
+      const response = await fetch(`${API_URL}/predecir-prueba`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formulario), // Enviamos los datos del formulario directamente
+      });
 
-        // Lógica de simulación algorítmica local
-        if (temp > 32 || hum < 30 || ndvi < 0.3) {
-          riesgoPredictivo = 'Severe';
-          recomendacionSugerida = `ALERTA CRÍTICA: Estrés térmico o hídrico severo detectado para ${cultivo}. Aplicar riego de emergencia inmediatamente y evaluar daño en follaje.`;
-        } else if ((temp > 28 && hum < 50) || ph < 5.0 || ph > 8.0) {
-          riesgoPredictivo = 'Moderate';
-          recomendacionSugerida = `Advertencia: El cultivo de ${cultivo} está fuera de su zona de confort. Ajustar niveles de riego y verificar disponibilidad de nutrientes por pH inadecuado.`;
-        } else if (hum > 85 || ndvi < 0.5) {
-          riesgoPredictivo = 'Mild';
-          recomendacionSugerida = `Atención: Humedad muy alta o pérdida leve de vigor. Riesgo incipiente de proliferación de hongos. Asegurar buen drenaje.`;
-        } else if (temp < 10) {
-           riesgoPredictivo = 'Moderate';
-           recomendacionSugerida = `Peligro por bajas temperaturas. Riesgo de helada para ${cultivo}. Tomar medidas térmicas preventivas.`;
-        }
-
-        setResultado({
-          riesgo: riesgoPredictivo,
-          recomendacion: recomendacionSugerida
-        });
-      } catch {
-        setError('Error interno al procesar los parámetros analíticos.');
-      } finally {
-        setCargando(false);
+      if (!response.ok) {
+        throw new Error(`Error en el servidor: ${response.status}`);
       }
-    }, 1200); // Retraso simulado de 1.2s para efecto visual de procesamiento
+
+      // 3. Recibimos la respuesta de la IA
+      const data = await response.json();
+
+      // 4. Actualizamos la pantalla con la predicción real
+      setResultado({
+        riesgo: data.riesgo,
+        recomendacion: data.recomendacion
+      });
+
+    } catch (err) {
+      console.error(err);
+      setError('Error de conexión con el motor de IA. Verifica que el backend esté encendido.');
+    } finally {
+      setCargando(false);
+    }
   };
 
   // Helpers visuales para el resultado

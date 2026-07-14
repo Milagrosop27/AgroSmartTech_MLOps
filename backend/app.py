@@ -340,6 +340,65 @@ def datos_dashboard():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/predecir-prueba', methods=['POST'])
+def predecir_prueba():
+    """
+    Ruta SANDBOX: Ejecuta los modelos .pkl de Machine Learning
+    exactamente igual que en producción, pero NO guarda en BigQuery.
+    Exclusivo para la vista del Simulador Manual.
+    """
+    try:
+        datos_json = request.get_json()
+
+        # 1. Convertir a DataFrame (asegurando que sea procesable aunque sea 1 solo registro)
+        df_nuevo = pd.DataFrame([datos_json]) if isinstance(datos_json, dict) else pd.DataFrame(datos_json)
+
+        # 2. Rellenar columnas faltantes (Igual que en producción)
+        required_columns = [
+            'total_days', 'P', 'region', 'N', 'irrigation_type', 'rainfall_mm',
+            'soil_moisture_%', 'sunlight_hours', 'K', 'yield_kg_per_hectare',
+            'fertilizer_type', 'pesticide_usage_ml'
+        ]
+        for col in required_columns:
+            if col not in df_nuevo.columns:
+                if col in ('region', 'irrigation_type', 'fertilizer_type'):
+                    df_nuevo[col] = 'Unknown'
+                else:
+                    df_nuevo[col] = 0
+
+        # 3. Predicción Guardián (riesgo de enfermedad)
+        proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
+        pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
+        riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g)
+
+        # 4. Predicción Agrónomo (recomendación de fertilizante)
+        proc_a = sistemas_ia['pre_agronomo'].transform(df_nuevo)
+        pred_a = sistemas_ia['modelo_agronomo'].predict(proc_a)
+        recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a)
+
+        # 5. Fusión IA + reglas IoT (fertilizante + estado de riego)
+        recoms_combinadas = []
+        for i, row in df_nuevo.iterrows():
+            humedad = float(row.get('humidity_%', 0))
+            temperatura = float(row.get('temperature_C', 0))
+            accion_riego = calcular_estado_riego(humedad, temperatura)
+            # Formateamos el texto igual que en tu ruta original
+            recoms_combinadas.append(f"Aplicar {recoms[i]}. Ademas: {accion_riego}.")
+
+
+        logging.info("Simulación de prueba ejecutada con éxito (Sin guardado en BD).")
+
+        # 6. Devolver EXACTAMENTE lo que React necesita
+        return jsonify({
+            "riesgo": str(riesgos[0]),
+            "recomendacion": str(recoms_combinadas[0])
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Error en simulacion de prueba: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/zonas', methods=['GET'])
 def obtener_zonas():
     """
