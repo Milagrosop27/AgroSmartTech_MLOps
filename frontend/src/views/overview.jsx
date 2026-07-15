@@ -66,17 +66,12 @@ const HeroBienvenida = () => {
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden mb-8 h-52 md:h-60">
-      {/* Imagen de fondo */}
       <img
         src="https://i.pinimg.com/1200x/50/d3/6d/50d36d2f4ed564da4ae15a2aa94ae02b.jpg"
         alt="Campo agrícola"
         className="absolute inset-0 w-full h-full object-cover"
       />
-
-      {/* Overlay degradado */}
       <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/40 to-transparent" />
-
-      {/* Contenido */}
       <div className="relative z-10 h-full flex flex-col justify-center px-8 py-6">
         <p className="text-white/70 text-sm font-medium tracking-widest uppercase mb-1">
           {fecha}
@@ -88,8 +83,6 @@ const HeroBienvenida = () => {
           Selecciona una hectárea para explorar sus sectores.
         </p>
       </div>
-
-      {/* Badge live */}
       <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm border border-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
         <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
         En vivo
@@ -126,39 +119,64 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-gray-800">Enviar alerta</h3>
+          <h3 className="text-lg font-bold text-gray-800">Detalles de Alerta</h3>
           <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={20} />
           </button>
         </div>
 
-        <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-600">
-          Sector: <span className="font-bold text-gray-800">{registro?.farm_id}</span>
-          {' · '}
-          Riesgo: <span className={`font-bold ${
+        {/* CINTA DE RIESGO */}
+        <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-600 flex justify-between">
+          <span>Sector: <span className="font-bold text-gray-800">{registro?.farm_id}</span></span>
+          <span>Riesgo: <span className={`font-bold ${
             registro?.crop_disease_status === 'Severe'   ? 'text-red-600'   :
             registro?.crop_disease_status === 'Moderate' ? 'text-amber-500' :
             'text-yellow-500'
           }`}>
             {traducirRiesgo(registro?.crop_disease_status)}
-          </span>
+          </span></span>
         </div>
 
-        <p className="text-sm font-semibold text-gray-500 mb-2">Seleccionar agricultor:</p>
+        {/* NUEVO: PANEL DE SENSORES Y NUTRIENTES */}
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          <div className="bg-blue-50 border border-blue-100 p-2 rounded-lg text-center">
+            <span className="block text-[10px] uppercase font-bold text-blue-500">Clima</span>
+            <span className="text-xs font-bold text-gray-800 block mt-1">
+              {registro?.temperature_C || '--'}°C
+            </span>
+            <span className="text-[10px] text-gray-500 font-semibold">{registro?.['humidity_%'] || '--'}% Hum</span>
+          </div>
+          <div className="bg-green-50 border border-green-100 p-2 rounded-lg text-center">
+            <span className="block text-[10px] uppercase font-bold text-green-600">Suelo</span>
+            <span className="text-xs font-bold text-gray-800 block mt-1">
+              pH: {registro?.soil_pH || '--'}
+            </span>
+            <span className="text-[10px] text-gray-500 font-semibold">NDVI: {registro?.NDVI_index || '--'}</span>
+          </div>
+          <div className="bg-purple-50 border border-purple-100 p-2 rounded-lg text-center">
+            <span className="block text-[10px] uppercase font-bold text-purple-600">Nutrientes</span>
+            <span className="text-xs font-bold text-gray-800 block mt-1 tracking-widest">
+              {registro?.n || '--'}-{registro?.p || '--'}-{registro?.k || '--'}
+            </span>
+            <span className="text-[10px] text-gray-500 font-semibold">N - P - K</span>
+          </div>
+        </div>
+
+        <p className="text-sm font-semibold text-gray-500 mb-2">Notificar al agricultor:</p>
 
         {cargando ? (
           <p className="text-sm text-gray-400 py-4 text-center animate-pulse">Cargando agricultores...</p>
         ) : agricultores.length === 0 ? (
-          <div className="py-4 text-center">
+          <div className="py-4 text-center border border-dashed border-gray-300 rounded-xl">
             <p className="text-sm text-amber-600 font-semibold">No hay agricultores registrados.</p>
             <p className="text-xs text-gray-400 mt-1">
               El agricultor debe enviar "join &lt;palabra&gt;" al Sandbox de Twilio primero.
             </p>
           </div>
         ) : (
-          <div className="space-y-3 max-h-56 overflow-y-auto mb-4">
+          <div className="space-y-3 max-h-48 overflow-y-auto mb-4 pr-1">
             {areasOrdenadas.map((area) => (
               <div key={area}>
                 <div className="flex items-center gap-2 mb-1.5">
@@ -204,7 +222,7 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
         <div className="flex gap-2 mt-2">
           <button
             onClick={onCerrar}
-            className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
           >
             Cancelar
           </button>
@@ -216,9 +234,9 @@ const ModalAgricultor = ({ registro, onConfirmar, onCerrar }) => {
               }
             }}
             disabled={!seleccionado || agricultores.length === 0}
-            className="flex-1 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors flex justify-center items-center gap-2"
           >
-            Enviar alerta
+            Enviar a WhatsApp
           </button>
         </div>
       </div>
@@ -333,13 +351,18 @@ const GridSubsectores = ({ sectores, parcelas, manejarAprobacionAlerta }) => {
   parcelas.forEach((p) => { mapaUltimos[p.farm_id] = p; });
 
   return (
-    <div className="mb-6">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-        {sectores.map((farmId) => {
-          const registro = mapaUltimos[farmId];
-          const estado   = registro?.crop_disease_status || 'Healthy';
-          const ndvi     = registro ? Number(registro.NDVI_index).toFixed(2) : '—';
-          const hum      = registro ? Number(registro['humidity_%']).toFixed(1) : '—';
+      <div className="mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          {sectores.map((farmId) => {
+            const registro = mapaUltimos[farmId];
+            const estado = registro?.crop_disease_status || 'Healthy';
+            const temp = registro ? Number(registro.temperature_C).toFixed(1) : '—';
+            const hum = registro ? Number(registro['humidity_%']).toFixed(1) : '—';
+            const ph = registro ? Number(registro.soil_pH).toFixed(1) : '—';
+            const n = registro ? registro.n : '—';
+            const p = registro ? registro.p : '—';
+            const k = registro ? registro.k : '—';
+            const ndvi = registro ? Number(registro.NDVI_index).toFixed(2) : '—';
 
           return (
             <div
@@ -354,8 +377,13 @@ const GridSubsectores = ({ sectores, parcelas, manejarAprobacionAlerta }) => {
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 space-y-0.5">
-                  <p>NDVI: <span className="font-semibold text-gray-700">{ndvi}</span></p>
-                  <p>Hum: <span className="font-semibold text-gray-700">{hum}%</span></p>
+                  <p>Temp: <span className="font-semibold text-gray-800">{temp}°C</span></p>
+                  <p>Hum: <span className="font-semibold text-gray-800">{hum}%</span></p>
+                  <p>pH: <span className="font-semibold text-gray-800">{ph}</span></p>
+                  <p>NDVI: <span className="font-semibold text-gray-800">{ndvi}</span></p>
+                  <p className="col-span-2 mt-1 border-t pt-1">
+                    NPK: <span className="font-bold text-green-700">{n}-{p}-{k}</span>
+                  </p>
                 </div>
               </div>
 
@@ -390,6 +418,7 @@ const GridSubsectores = ({ sectores, parcelas, manejarAprobacionAlerta }) => {
     </div>
   );
 };
+
 
 // --- COMPONENTE PRINCIPAL ---
 const Overview = ({

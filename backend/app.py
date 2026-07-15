@@ -60,7 +60,6 @@ def obtener_bq_client():
             bq_client = None
     return bq_client
 
-
 confirmaciones_whatsapp = []
 control_alertas = {}
 
@@ -78,8 +77,6 @@ def cargar_recursos():
         logging.info("Sistemas IA cargados correctamente.")
     except Exception as e:
         logging.error(f"Error critico al cargar modelos: {e}")
-
-
 cargar_recursos()
 
 def debe_enviar_alerta(farm_id):
@@ -89,7 +86,6 @@ def debe_enviar_alerta(farm_id):
         return True
     return False
 
-# --- SISTEMA EXPERTO BASADO EN REGLAS (IoT RIEGO) ---
 def calcular_estado_riego(humedad, temperatura):
     if humedad < 30 and temperatura > 30:
         return "Activar Riego de Emergencia (Max)"
@@ -163,7 +159,15 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
                 "riesgo_enfermedad": str(riesgo),
                 "recomendacion":    str(recomendacion),
                 "farm_id":          str(dato.get('farm_id', 'FARM_UNKNOWN')),
-                "crop_type":        str(dato.get('crop_type', 'No especificado'))
+                "crop_type":        str(dato.get('crop_type', 'No especificado')),
+                "sunlight_hours": round(float(dato.get('sunlight_hours', 0)), 2),
+                "irrigation_type": str(dato.get('irrigation_type', 'Desconocido')),
+                "n": round(float(dato.get('N', 0)), 2),
+                "p": round(float(dato.get('P', 0)), 2),
+                "k": round(float(dato.get('K', 0)), 2),
+                "soil_moisture": round(float(dato.get('soil_moisture_%', 0)), 2),
+                "rainfall_mm": round(float(dato.get('rainfall_mm', 0)), 2)
+
             }
             filas.append(fila)
 
@@ -183,28 +187,28 @@ def guardar_en_bigquery(datos_json_lista, riesgos, recomendaciones):
     except Exception as e:
         logging.error(f"Error en guardar_en_bigquery: {e}")
 
-
 @app.route('/predecir', methods=['POST'])
 def predecir():
     try:
         datos_json = request.get_json()
         df_nuevo = pd.DataFrame(datos_json) if isinstance(datos_json, list) else pd.DataFrame([datos_json])
 
-        required_columns = [
-            'total_days', 'P', 'region', 'N', 'irrigation_type', 'rainfall_mm',
-            'soil_moisture_%', 'sunlight_hours', 'K', 'yield_kg_per_hectare',
-            'fertilizer_type', 'pesticide_usage_ml'
+        # NUEVAS COLUMNAS OFICIALES DE IOT (Alineadas con los modelos purificados)
+        columnas_esperadas = [
+            'region', 'crop_type', 'temperature_C', 'humidity_%', 'rainfall_mm',
+            'sunlight_hours', 'soil_pH', 'soil_moisture_%', 'NDVI_index', 'N', 'P', 'K'
         ]
-        for col in required_columns:
+
+        for col in columnas_esperadas:
             if col not in df_nuevo.columns:
-                if col in ('region', 'irrigation_type', 'fertilizer_type'):
-                    df_nuevo[col] = 'Unknown'
+                if col in ('region', 'crop_type'):
+                    df_nuevo[col] = 'Desconocido'
                 else:
-                    df_nuevo[col] = 0
+                    df_nuevo[col] = 0.0
 
         # Prediccion Guardian (riesgo de enfermedad)
-        proc_g  = sistemas_ia['pre_guardian'].transform(df_nuevo)
-        pred_g  = sistemas_ia['modelo_guardian'].predict(proc_g)
+        proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
+        pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
         riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g)
 
         # Prediccion Agronomo (recomendacion de fertilizante)
@@ -215,7 +219,7 @@ def predecir():
         # Fusion IA + reglas IoT (fertilizante + estado de riego)
         recoms_combinadas = []
         for i, row in df_nuevo.iterrows():
-            humedad     = float(row.get('humidity_%', 0))
+            humedad = float(row.get('humidity_%', 0))
             temperatura = float(row.get('temperature_C', 0))
             accion_riego = calcular_estado_riego(humedad, temperatura)
             recoms_combinadas.append(f"Aplicar {recoms[i]}. Ademas: {accion_riego}.")
@@ -225,31 +229,62 @@ def predecir():
         logging.info(f"Procesadas {len(riesgos)} predicciones.")
 
         return jsonify({
-            "estado_riesgo":       riesgos.tolist(),
-            "status":              "success",
+            "estado_riesgo": riesgos.tolist(),
+            "status": "success",
             "registros_procesados": len(riesgos)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+@app.route('/predecir-prueba', methods=['POST'])
+def predecir_prueba():
+    try:
+        datos_json = request.get_json()
+        df_nuevo = pd.DataFrame([datos_json]) if isinstance(datos_json, dict) else pd.DataFrame(datos_json)
+
+        # NUEVAS COLUMNAS OFICIALES DE IOT
+        columnas_esperadas = [
+            'region', 'crop_type', 'temperature_C', 'humidity_%', 'rainfall_mm',
+            'sunlight_hours', 'soil_pH', 'soil_moisture_%', 'NDVI_index', 'N', 'P', 'K'
+        ]
+
+        for col in columnas_esperadas:
+            if col not in df_nuevo.columns:
+                if col in ('region', 'crop_type'):
+                    df_nuevo[col] = 'Desconocido'
+                else:
+                    df_nuevo[col] = 0.0
+
+        proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
+        pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
+        riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g)
+
+        proc_a = sistemas_ia['pre_agronomo'].transform(df_nuevo)
+        pred_a = sistemas_ia['modelo_agronomo'].predict(proc_a)
+        recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a)
+
+        recoms_combinadas = []
+        for i, row in df_nuevo.iterrows():
+            humedad = float(row.get('humidity_%', 0))
+            temperatura = float(row.get('temperature_C', 0))
+            accion_riego = calcular_estado_riego(humedad, temperatura)
+            recoms_combinadas.append(f"Aplicar {recoms[i]}. Ademas: {accion_riego}.")
+
+        logging.info("Simulación de prueba ejecutada con éxito (Sin guardado en BD).")
+
+        return jsonify({
+            "riesgo": str(riesgos[0]),
+            "recomendacion": str(recoms_combinadas[0])
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Error en simulacion de prueba: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/datos-dashboard', methods=['GET'])
 def datos_dashboard():
     """
     Retorna el historico de predicciones desde BigQuery.
-
-    Parametros opcionales (query string):
-      - minutos  : ventana temporal en minutos (default 1440 = 24h)
-      - hectarea : filtra por hectarea, ej. ?hectarea=H1
-                   Si se omite, devuelve todas las hectareas.
-      - sector   : filtra por sector especifico dentro de la hectarea,
-                   ej. ?hectarea=H1&sector=S03
-                   Si se omite, devuelve todos los sectores de la hectarea.
-
-    Logica de filtrado:
-      - Sin parametros           → todos los farm_id
-      - ?hectarea=H1             → farm_id LIKE 'H1_%'  (los 10 sectores de H1)
-      - ?hectarea=H1&sector=S03  → farm_id = 'H1_S03'  (un sector exacto)
     """
     try:
         logging.info(f"/datos-dashboard solicitado desde {request.remote_addr}")
@@ -263,7 +298,6 @@ def datos_dashboard():
         sector            = request.args.get('sector',    default=None, type=str)
 
         # --- Construccion del filtro de zona ---
-        # Se usa parametros posicionales de BigQuery (@param) para evitar SQL injection.
         filtro_zona  = ""
         query_params = []
 
@@ -288,6 +322,7 @@ def datos_dashboard():
         else:
             logging.info("Sin filtro de zona: retornando todas las hectareas.")
 
+        # 🚨 CAMBIO 1: Agregamos n, p, k y soil_moisture a la consulta SQL
         query = f"""
             SELECT
                 fecha_hora,
@@ -295,6 +330,10 @@ def datos_dashboard():
                 humedad,
                 ph,
                 ndvi,
+                n,
+                p,
+                k,
+                soil_moisture,
                 riesgo_enfermedad,
                 recomendacion,
                 farm_id,
@@ -317,12 +356,18 @@ def datos_dashboard():
 
         historico = []
         for row in results:
+            # 🚨 CAMBIO 2: Agregamos las nuevas variables al JSON que se va a React
+            # Se usa validación "if row.n else 0" por si hay registros antiguos vacíos
             historico.append({
                 "fecha":              row.fecha_hora.strftime('%H:%M:%S'),
-                "temperature_C":      round(float(row.temperatura), 2),
-                "humidity_%":         round(float(row.humedad), 2),
-                "soil_pH":            round(float(row.ph), 2),
-                "NDVI_index":         round(float(row.ndvi), 2),
+                "temperature_C":      round(float(row.temperatura), 2) if row.temperatura is not None else 0,
+                "humidity_%":         round(float(row.humedad), 2) if row.humedad is not None else 0,
+                "soil_pH":            round(float(row.ph), 2) if row.ph is not None else 0,
+                "NDVI_index":         round(float(row.ndvi), 2) if row.ndvi is not None else 0,
+                "n":                  round(float(row.n), 2) if row.n is not None else 0,
+                "p":                  round(float(row.p), 2) if row.p is not None else 0,
+                "k":                  round(float(row.k), 2) if row.k is not None else 0,
+                "soil_moisture_%":    round(float(row.soil_moisture), 2) if row.soil_moisture is not None else 0,
                 "diagnostico":        str(row.riesgo_enfermedad),
                 "recomendacion":      str(row.recomendacion),
                 "farm_id":            str(row.farm_id),
@@ -338,66 +383,6 @@ def datos_dashboard():
     except Exception as e:
         logging.error(f"Error en dashboard: {e}")
         return jsonify({"error": str(e)}), 500
-
-
-@app.route('/predecir-prueba', methods=['POST'])
-def predecir_prueba():
-    """
-    Ruta SANDBOX: Ejecuta los modelos .pkl de Machine Learning
-    exactamente igual que en producción, pero NO guarda en BigQuery.
-    Exclusivo para la vista del Simulador Manual.
-    """
-    try:
-        datos_json = request.get_json()
-
-        # 1. Convertir a DataFrame (asegurando que sea procesable aunque sea 1 solo registro)
-        df_nuevo = pd.DataFrame([datos_json]) if isinstance(datos_json, dict) else pd.DataFrame(datos_json)
-
-        # 2. Rellenar columnas faltantes (Igual que en producción)
-        required_columns = [
-            'total_days', 'P', 'region', 'N', 'irrigation_type', 'rainfall_mm',
-            'soil_moisture_%', 'sunlight_hours', 'K', 'yield_kg_per_hectare',
-            'fertilizer_type', 'pesticide_usage_ml'
-        ]
-        for col in required_columns:
-            if col not in df_nuevo.columns:
-                if col in ('region', 'irrigation_type', 'fertilizer_type'):
-                    df_nuevo[col] = 'Unknown'
-                else:
-                    df_nuevo[col] = 0
-
-        # 3. Predicción Guardián (riesgo de enfermedad)
-        proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
-        pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
-        riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g)
-
-        # 4. Predicción Agrónomo (recomendación de fertilizante)
-        proc_a = sistemas_ia['pre_agronomo'].transform(df_nuevo)
-        pred_a = sistemas_ia['modelo_agronomo'].predict(proc_a)
-        recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a)
-
-        # 5. Fusión IA + reglas IoT (fertilizante + estado de riego)
-        recoms_combinadas = []
-        for i, row in df_nuevo.iterrows():
-            humedad = float(row.get('humidity_%', 0))
-            temperatura = float(row.get('temperature_C', 0))
-            accion_riego = calcular_estado_riego(humedad, temperatura)
-            # Formateamos el texto igual que en tu ruta original
-            recoms_combinadas.append(f"Aplicar {recoms[i]}. Ademas: {accion_riego}.")
-
-
-        logging.info("Simulación de prueba ejecutada con éxito (Sin guardado en BD).")
-
-        # 6. Devolver EXACTAMENTE lo que React necesita
-        return jsonify({
-            "riesgo": str(riesgos[0]),
-            "recomendacion": str(recoms_combinadas[0])
-        }), 200
-
-    except Exception as e:
-        logging.error(f"Error en simulacion de prueba: {e}")
-        return jsonify({"error": str(e)}), 500
-
 
 @app.route('/api/zonas', methods=['GET'])
 def obtener_zonas():
@@ -455,11 +440,9 @@ def obtener_zonas():
         logging.error(f"Error en /api/zonas: {e}")
         return jsonify({"error": str(e)}), 500
 
-
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({"status": "AgroSmart Live"})
-
 
 @app.route('/enviar-alerta-wa', methods=['POST'])
 def despachar_alerta_whatsapp():
@@ -502,10 +485,10 @@ def despachar_alerta_whatsapp():
                     "fecha_hora": firestore.SERVER_TIMESTAMP
                 }
                 db_firestore.collection('historial_alertas').add(nueva_alerta)
-                logging.info(f"✅ Firestore: Alerta PENDING registrada para {telefono}")
+                logging.info(f" Firestore: Alerta PENDING registrada para {telefono}")
             except Exception as e:
-                logging.error(f"❌ Error al guardar alerta en Firestore: {e}")
-            # =======================================================
+                logging.error(f" Error al guardar alerta en Firestore: {e}")
+
 
             return jsonify({"status": "success", "sid": mensaje_o_error}), 200
         else:
@@ -513,7 +496,6 @@ def despachar_alerta_whatsapp():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/webhook', methods=['POST'])
 def recibir_eventos_whatsapp():
@@ -537,10 +519,10 @@ def recibir_eventos_whatsapp():
                 for doc in docs:
                     # Actualizamos el estado al valor que tu React use para el botón verde (ej: "Realizado")
                     doc.reference.update({'estado': 'Realizado'})
-                    logging.info(f"✅ Firestore actualizado a 'Realizado' para el doc {doc.id}")
+                    logging.info(f" Firestore actualizado a 'Realizado' para el doc {doc.id}")
 
             except Exception as e:
-                logging.error(f"❌ Error al actualizar estado en Firestore desde Webhook: {e}")
+                logging.error(f" Error al actualizar estado en Firestore desde Webhook: {e}")
 
         elif resultado.get("respuesta"):
             resp.message(resultado["respuesta"])
@@ -550,7 +532,6 @@ def recibir_eventos_whatsapp():
     except Exception as e:
         logging.error(f"Error en el webhook POST: {e}")
         return str(MessagingResponse()), 500
-
 
 @app.route('/api/confirmaciones', methods=['GET'])
 def obtener_confirmaciones():
@@ -645,9 +626,8 @@ def obtener_ndvi():
         img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
         url_imagen = f"data:image/png;base64,{img_base64}"
 
-        # ==========================================
         # PARTE 2: OBTENER EL NÚMERO EXACTO (PROMEDIO)
-        # ==========================================
+
         evalscript_num = """
         //VERSION=3
         function setup() {
@@ -673,9 +653,7 @@ def obtener_ndvi():
         data_num = peticion_num.get_data()[0]
         ndvi_promedio = float(np.mean(data_num))
 
-        # ==========================================
         # PARTE 3: ENVIAR AMBOS DATOS A REACT
-        # ==========================================
         return jsonify({
             "url_imagen_ndvi": url_imagen,
             "ndvi_promedio": round(ndvi_promedio, 4),

@@ -22,7 +22,6 @@ def limpiar_carpeta_modelos():
         shutil.rmtree(MODELS_DIR)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-
 # 2. FUNCIONES DEL PIPELINE
 
 def cargar_y_limpiar_datos():
