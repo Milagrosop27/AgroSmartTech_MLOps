@@ -48,31 +48,37 @@ def cargar_y_limpiar_datos():
 
     return df
 
-
 def entrenar_guardian(df):
     """Entrena el modelo clasificador para el estado de salud del cultivo."""
 
+    # Columnas que el simulador IoT NO puede producir en tiempo real:
+    # - yield_kg_per_hectare: fuga de datos (resultado posterior a la cosecha)
+    # - pesticide_usage_ml, total_days, fertilizer_type: bitácora agrícola,
+    #   no telemetría de sensores
+    columnas_no_disponibles_en_iot = [
+        'yield_kg_per_hectare', 'pesticide_usage_ml',
+        'total_days', 'fertilizer_type'
+    ]
+
     # Separación de características y variable objetivo
-    X = df.drop(columns=['crop_disease_status'])
+    X = df.drop(columns=['crop_disease_status'] + columnas_no_disponibles_en_iot)
     y = df['crop_disease_status']
 
     le_guardian = LabelEncoder()
     y_encoded = le_guardian.fit_transform(y)
 
-    # División Train/Test (70/30)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y_encoded, test_size=0.3, random_state=42, stratify=y_encoded
     )
 
-    # Definición de transformadores por tipo de dato
-    variables_categoricas = ['region', 'crop_type', 'irrigation_type', 'fertilizer_type']
+    # fertilizer_type ya no está en X, así que sale de las categóricas también
+    variables_categoricas = ['region', 'crop_type', 'irrigation_type']
     variables_numericas = [col for col in X.columns if col not in variables_categoricas]
 
     preprocesador = ColumnTransformer(transformers=[
         ('num', StandardScaler(), variables_numericas),
         ('cat', OneHotEncoder(handle_unknown='ignore'), variables_categoricas)
     ])
-
     X_train_processed = preprocesador.fit_transform(X_train)
     X_test_processed = preprocesador.transform(X_test)
 
