@@ -127,7 +127,6 @@ def aplicar_sesgo_zona(zona: dict, df_base_row: pd.Series) -> dict:
 
     return registro
 
-
 def generar_y_enviar_microbatch(df_base: pd.DataFrame) -> None:
     logging.info(f"Generando microbatch para {len(ZONAS)} zonas geo-referenciadas...")
     np.random.seed(int(time.time()))

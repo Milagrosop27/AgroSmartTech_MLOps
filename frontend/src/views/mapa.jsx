@@ -247,7 +247,7 @@ const Mapa = () => {
       </div>
 
       <div className="border-4 border-green-600 rounded-lg overflow-hidden shadow-lg">
-        <MapContainer bounds={bounds} style={{ height: '600px', width: '100%' }}>
+        <MapContainer bounds={bounds} style={{ height: '350px', width: '100%' }}>
           <TileLayer
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             attribution='Tiles &copy; Esri'

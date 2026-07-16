@@ -22,49 +22,75 @@ const traducirEstado = (estado) => {
 
 const ExportButtons = ({ historialAlertas }) => {
 
+  // --- HELPER 1: Formateo seguro de fechas ---
+  const formatearFecha = (alerta) => {
+    try {
+      // 1. Buscamos la fecha en todas las propiedades posibles de tu Firebase
+      const campoFecha = alerta.timestamp || alerta.fecha_registro || alerta.fecha_hora || alerta.fecha;
+
+      // Si definitivamente no hay ninguna fecha guardada en la BD
+      if (!campoFecha) return 'Sin Fecha';
+
+      // 2. Si viene de Firebase Timestamp (tiene .seconds)
+      if (campoFecha.seconds) {
+        return new Date(campoFecha.seconds * 1000).toLocaleString();
+      }
+
+      // 3. Si viene como un texto normal (String ISO)
+      const fecha = new Date(campoFecha);
+      if (!isNaN(fecha)) {
+        return fecha.toLocaleString();
+      }
+    } catch {
+      return 'Fecha Inválida';
+    }
+
+    return 'Sin Fecha';
+  };
+
+  // --- HELPER 2: Lógica del temporizador ---
+  const obtenerEstadoFinal = (alerta) => {
+    let estadoFinal = traducirEstado(alerta.estado);
+
+    if (alerta.estado === "PENDING" && alerta.fecha_hora) {
+      const fechaAlerta = alerta.fecha_hora.seconds
+          ? new Date(alerta.fecha_hora.seconds * 1000)
+          : new Date(alerta.fecha_hora);
+
+      const ahora = new Date();
+      const diferenciaMinutos = (ahora - fechaAlerta) / (1000 * 60);
+
+      // REGLAS DE TIEMPO
+
+      if (diferenciaMinutos >= 5) {
+        // Si pasaron 5 o más minutos
+        estadoFinal = "No atendido";
+      } else if (diferenciaMinutos >= 1) {
+        // Si no pasaron 5, pero sí pasó 1 o más minutos
+        estadoFinal = "Reenviar";
+      }
+      // (Si es menor a 1 minuto, se queda con su estado original "Esperando")
+    }
+
+    return estadoFinal;
+  };
+
+  // --- EXPORTAR PDF ---
   const exportarPDF = () => {
     if (!historialAlertas || historialAlertas.length === 0) return;
 
     const doc = new jsPDF();
     doc.text("Historial de Alertas - AgroSmart Tech", 14, 15);
 
-    // 1. Mantenemos tus columnas iguales
     const columnas = ["FECHA", "LOTE", "DIAGNÓSTICO", "ACCIÓN", "ESTADO"];
 
-// 2. Mapeamos las filas corrigiendo los nombres de los campos y agregando el temporizador
-    const filas = historialAlertas.map(alerta => {
-
-      // --- LÓGICA DEL TEMPORIZADOR PARA EL ESTADO ---
-      let estadoFinal = traducirEstado(alerta.estado); // Por defecto: "Esperando..." o "Realizado"
-
-      if (alerta.estado === "PENDING" && alerta.fecha_hora) {
-        // Convertimos la fecha de la alerta a milisegundos
-        // (Soporta si viene como Firestore Timestamp {seconds: ...} o como String ISO)
-        const fechaAlerta = alerta.fecha_hora.seconds
-            ? new Date(alerta.fecha_hora.seconds * 1000)
-            : new Date(alerta.fecha_hora);
-
-        const ahora = new Date();
-        const diferenciaMinutos = (ahora - fechaAlerta) / (1000 * 60);
-
-        // ⏱️ SI PASARON MÁS DE 5 MINUTOS Y SIGUE PENDIENTE -> CAMBIA A REENVIAR
-        if (diferenciaMinutos >= 5) {
-          estadoFinal = "Reenviar";
-        }
-      }
-      // ----------------------------------------------
-
-      return [
-        alerta.fecha_hora?.seconds
-            ? new Date(alerta.fecha_hora.seconds * 1000).toLocaleString()
-            : alerta.fecha || new Date(alerta.fecha_hora).toLocaleString(),
-
-        alerta.farm_id || "Sin Lote",   // 👈 Corregido: cambia .lote por .farm_id
-        traducirRiesgo(alerta.diagnostico),
-        alerta.accion || "Sin Acción",   // 👈 Corregido: cambia .recomendacion por .accion
-        estadoFinal                     // 👈 Usa el estado calculado con el temporizador
-      ];
-    });
+    const filas = historialAlertas.map(alerta => [
+      formatearFecha(alerta),
+      alerta.farm_id || "Sin Lote",
+      traducirRiesgo(alerta.diagnostico),
+      alerta.accion || "Sin Acción",
+      obtenerEstadoFinal(alerta)
+    ]);
 
     autoTable(doc, {
       head: [columnas],
@@ -77,16 +103,18 @@ const ExportButtons = ({ historialAlertas }) => {
     doc.save(`AgroSmart_Alertas_${new Date().getTime()}.pdf`);
   };
 
+  // --- EXPORTAR CSV ---
   const exportarCSV = () => {
     if (!historialAlertas || historialAlertas.length === 0) return;
 
     const cabeceras = ["FECHA", "LOTE", "DIAGNOSTICO", "ACCION", "ESTADO"];
+
     const filas = historialAlertas.map(alerta => [
-      `"${alerta.fecha}"`,
-      `"${alerta.lote}"`,
-      `"${traducirRiesgo(alerta.diagnostico)}"`,  // ✅ traducido
-      `"${alerta.recomendacion}"`,
-      `"${traducirEstado(alerta.estado)}"`          // ✅ traducido
+      `"${formatearFecha(alerta)}"`,
+      `"${alerta.farm_id || "Sin Lote"}"`,
+      `"${traducirRiesgo(alerta.diagnostico)}"`,
+      `"${alerta.accion || "Sin Acción"}"`,
+      `"${obtenerEstadoFinal(alerta)}"`
     ]);
 
     const contenidoCSV = [
@@ -94,7 +122,9 @@ const ExportButtons = ({ historialAlertas }) => {
       ...filas.map(fila => fila.join(','))
     ].join('\n');
 
-    const blob = new Blob([contenidoCSV], { type: 'text/csv;charset=utf-8;' });
+
+    const blob = new Blob(['\uFEFF' + contenidoCSV], { type: 'text/csv;charset=utf-8;' });
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

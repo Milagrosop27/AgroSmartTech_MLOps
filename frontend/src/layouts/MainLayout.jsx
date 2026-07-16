@@ -156,7 +156,7 @@ const MainLayout = ({ origenDatos = 'cargando' }) => {
             <div className={`transition-all duration-300 whitespace-nowrap ${isHovered ? 'opacity-100 h-auto mb-4' : 'opacity-0 h-0 mb-0'}`}>
               <p className="text-xs text-gray-400 mb-1 px-2">Estado de datos:</p>
               <div className={`flex items-center gap-2 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm w-full font-medium ${origenDatos === 'api' ? 'bg-green-500' : 'bg-blue-500'}`}>
-                {origenDatos === 'api' ? '✅ En vivo (API)' : '📦 Último registro'}
+                {origenDatos === 'api' ? ' En vivo (API)' : ' Último registro'}
               </div>
             </div>
 
