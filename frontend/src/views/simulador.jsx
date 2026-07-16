@@ -174,7 +174,7 @@ const Simulador = () => {
             <button
               type="submit"
               disabled={cargando}
-              className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white p-4 rounded-xl font-bold transition-all disabled:bg-gray-400"
+              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-800 text-white p-4 rounded-xl font-bold transition-all disabled:bg-gray-400"
             >
               {cargando ? (
                 <span className="animate-pulse">Procesando reglas lógicas...</span>

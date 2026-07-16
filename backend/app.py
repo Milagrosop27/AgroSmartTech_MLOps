@@ -240,21 +240,27 @@ def predecir():
 def predecir_prueba():
     try:
         datos_json = request.get_json()
-        df_nuevo = pd.DataFrame([datos_json]) if isinstance(datos_json, dict) else pd.DataFrame(datos_json)
 
-        # NUEVAS COLUMNAS OFICIALES DE IOT
-        columnas_esperadas = [
-            'region', 'crop_type', 'temperature_C', 'humidity_%', 'rainfall_mm',
-            'sunlight_hours', 'soil_pH', 'soil_moisture_%', 'NDVI_index', 'N', 'P', 'K'
-        ]
+        # 1. Definimos los valores por defecto (estables) para completar lo que falta
+        valores_por_defecto = {
+            'region': 'North India',  # Valor genérico basado en tu dataset
+            'rainfall_mm': 100.0,  # Promedio estándar
+            'sunlight_hours': 8.0,  # Promedio estándar
+            'soil_moisture_%': 45.0,  # Humedad de suelo típica
+            'N': 50.0,  # Nivel medio de Nitrógeno
+            'P': 50.0,  # Nivel medio de Fósforo
+            'K': 50.0,  # Nivel medio de Potasio
+            'irrigation_type': 'Desconocido'
+        }
 
-        for col in columnas_esperadas:
-            if col not in df_nuevo.columns:
-                if col in ('region', 'crop_type'):
-                    df_nuevo[col] = 'Desconocido'
-                else:
-                    df_nuevo[col] = 0.0
+        # 2. Combinamos lo que envió el usuario con los valores por defecto
+        # El usuario puede enviar los 5 campos, el resto se completa automáticamente
+        datos_completos = {**valores_por_defecto, **datos_json}
 
+        df_nuevo = pd.DataFrame([datos_completos])
+
+        # 3. Procedemos a transformar y predecir
+        # Asegúrate de que las columnas coincidan con las que espera el modelo
         proc_g = sistemas_ia['pre_guardian'].transform(df_nuevo)
         pred_g = sistemas_ia['modelo_guardian'].predict(proc_g)
         riesgos = sistemas_ia['le_guardian'].inverse_transform(pred_g)
@@ -263,18 +269,14 @@ def predecir_prueba():
         pred_a = sistemas_ia['modelo_agronomo'].predict(proc_a)
         recoms = sistemas_ia['le_agronomo'].inverse_transform(pred_a)
 
-        recoms_combinadas = []
-        for i, row in df_nuevo.iterrows():
-            humedad = float(row.get('humidity_%', 0))
-            temperatura = float(row.get('temperature_C', 0))
-            accion_riego = calcular_estado_riego(humedad, temperatura)
-            recoms_combinadas.append(f"Aplicar {recoms[i]}. Ademas: {accion_riego}.")
-
-        logging.info("Simulación de prueba ejecutada con éxito (Sin guardado en BD).")
+        # 4. Cálculo de riego lógico (opcional)
+        humedad = float(datos_completos.get('humidity_%', 60.0))
+        temperatura = float(datos_completos.get('temperature_C', 25.0))
+        accion_riego = calcular_estado_riego(humedad, temperatura)
 
         return jsonify({
             "riesgo": str(riesgos[0]),
-            "recomendacion": str(recoms_combinadas[0])
+            "recomendacion": f"Aplicar {recoms[0]}. Ademas: {accion_riego}."
         }), 200
 
     except Exception as e:
@@ -626,17 +628,25 @@ def obtener_ndvi():
         img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
         url_imagen = f"data:image/png;base64,{img_base64}"
 
+        # ==========================================
         # PARTE 2: OBTENER EL NÚMERO EXACTO (PROMEDIO)
-
+        # ==========================================
         evalscript_num = """
-        //VERSION=3
-        function setup() {
-          return { input: ["B04", "B08"], output: { bands: 1 } };
-        }
-        function evaluatePixel(sample) {
-          return [(sample.B08 - sample.B04) / (sample.B08 + sample.B04)];
-        }
-        """
+                //VERSION=3
+                function setup() {
+                  return { 
+                    input: ["B04", "B08"], 
+                    // AQUÍ ESTÁ LA MAGIA: Obligamos a devolver decimales puros (FLOAT32)
+                    output: { bands: 1, sampleType: "FLOAT32" } 
+                  };
+                }
+                function evaluatePixel(sample) {
+                  let suma = sample.B08 + sample.B04;
+                  // Prevenimos que la matemática explote si la suma es 0
+                  let ndvi = suma === 0 ? 0 : (sample.B08 - sample.B04) / suma;
+                  return [ndvi];
+                }
+                """
 
         peticion_num = SentinelHubRequest(
             evalscript=evalscript_num,
