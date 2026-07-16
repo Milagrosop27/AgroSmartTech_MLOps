@@ -9,7 +9,7 @@ const Simulador = () => {
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState('');
 
-  // Estado inicial del formulario
+  // Estado inicial del formulario (puede ser texto o número, no importa aquí)
   const [formulario, setFormulario] = useState({
     temperature_C: 25.0,
     'humidity_%': 60.0,
@@ -18,13 +18,15 @@ const Simulador = () => {
     crop_type: 'Maíz'
   });
 
-  const cultivosDisponibles = ['Maíz', 'Trigo', 'Papa', 'Quinua', 'Espárrago'];
+  const cultivosDisponibles = ['Maíz', 'Trigo', 'Soja', 'Arroz', 'Algodón'];
 
   const manejarCambio = (e) => {
     const { name, value } = e.target;
     setFormulario(prev => ({
       ...prev,
-      [name]: name === 'crop_type' ? value : Number(value)
+      // SOLUCIÓN: Guardamos el valor exacto como texto (incluso si es "")
+      // Ya no forzamos Number(value) aquí.
+      [name]: value
     }));
   };
 
@@ -34,27 +36,32 @@ const Simulador = () => {
     setError('');
     setResultado(null);
 
+    // Aquí es donde convertimos el texto a número de forma segura
+    const payload = {
+        ...formulario,
+        temperature_C: parseFloat(formulario.temperature_C) || 0,
+        'humidity_%': parseFloat(formulario['humidity_%']) || 0,
+        soil_pH: parseFloat(formulario.soil_pH) || 0,
+        NDVI_index: parseFloat(formulario.NDVI_index) || 0,
+    };
+
     try {
-      // 1. Definimos la URL de tu API
       const API_URL = 'https://agrosmart-api-940420015515.us-central1.run.app';
 
-      // 2. Hacemos la petición a la nueva ruta "sandbox" que creamos
       const response = await fetch(`${API_URL}/predecir-prueba`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formulario), // Enviamos los datos del formulario directamente
+        body: JSON.stringify(payload), // Enviamos el PAYLOAD procesado, no el formulario crudo
       });
 
       if (!response.ok) {
         throw new Error(`Error en el servidor: ${response.status}`);
       }
 
-      // 3. Recibimos la respuesta de la IA
       const data = await response.json();
 
-      // 4. Actualizamos la pantalla con la predicción real
       setResultado({
         riesgo: data.riesgo,
         recomendacion: data.recomendacion
@@ -68,7 +75,6 @@ const Simulador = () => {
     }
   };
 
-  // Helpers visuales para el resultado
   const getColorResultado = (riesgo) => {
     if (riesgo === 'Severe') return 'bg-red-50 border-red-200 text-red-800';
     if (riesgo === 'Moderate' || riesgo === 'Mild') return 'bg-amber-50 border-amber-200 text-amber-800';
@@ -94,14 +100,12 @@ const Simulador = () => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* PANEL DE FORMULARIO */}
         <div className="lg:col-span-7 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-bold text-gray-800 mb-6 border-b pb-3">Parámetros Agronómicos</h3>
 
           <form onSubmit={ejecutarSimulacion} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-              {/* SELECTOR DE CULTIVO */}
               <div className="col-span-1 md:col-span-2">
                 <label className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-2">
                   <Sprout size={16} className="text-green-600"/> Tipo de Cultivo
@@ -118,7 +122,6 @@ const Simulador = () => {
                 </select>
               </div>
 
-              {/* TEMPERATURA */}
               <div>
                 <label className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-2">
                   <Thermometer size={16} className="text-red-500"/> Temperatura (°C)
@@ -131,7 +134,6 @@ const Simulador = () => {
                 />
               </div>
 
-              {/* HUMEDAD */}
               <div>
                 <label className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-2">
                   <Droplets size={16} className="text-blue-500"/> Humedad (%)
@@ -144,7 +146,6 @@ const Simulador = () => {
                 />
               </div>
 
-              {/* PH DEL SUELO */}
               <div>
                 <label className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-2">
                   <FlaskConical size={16} className="text-purple-500"/> pH del Suelo
@@ -157,7 +158,6 @@ const Simulador = () => {
                 />
               </div>
 
-              {/* NDVI */}
               <div>
                 <label className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-2">
                   <Leaf size={16} className="text-green-500"/> Índice NDVI (0 a 1)
@@ -188,7 +188,6 @@ const Simulador = () => {
           </form>
         </div>
 
-        {/* PANEL DE RESULTADO */}
         <div className="lg:col-span-5">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl mb-4 flex items-center gap-3">

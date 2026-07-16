@@ -112,6 +112,13 @@ const Alerts = ({ manejarAprobacionAlerta }) => {
   const [filtroDiagnostico, setFiltroDiagnostico] = useState('todos');
   const [mostrarFiltros,    setMostrarFiltros]    = useState(false);
   const [paginaActual,      setPaginaActual]      = useState(1);
+  const [horaActual,        setHoraActual]        = useState(new Date());
+
+  useEffect(() => {
+    // Actualizamos la hora cada 30 segundos para que la tabla reaccione
+    const intervalo = setInterval(() => setHoraActual(new Date()), 30000);
+    return () => clearInterval(intervalo);
+  }, []);
 
   // Escuchar Firestore en tiempo real
   useEffect(() => {
@@ -193,10 +200,8 @@ const Alerts = ({ manejarAprobacionAlerta }) => {
         }
       }
 
-      // estado en español directo: "Esperando", "Realizado", "Sin respuesta"
       if (filtroEstado !== 'todos' && alerta.estado !== filtroEstado) return false;
 
-      // lote por prefijo H1, H2…
       if (filtroLote !== 'todos') {
         if (!alerta.farm_id?.startsWith(filtroLote)) return false;
       }
@@ -396,32 +401,53 @@ const Alerts = ({ manejarAprobacionAlerta }) => {
                     {alerta.accion}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex justify-end">
-                      {alerta.estado === 'Esperando' && (
-                        <span className="flex items-center gap-1 text-yellow-600 text-xs font-semibold px-3 py-1 bg-yellow-50 rounded-md border border-yellow-200">
-                          <Clock size={14} className="animate-spin" /> Esperando...
-                        </span>
-                      )}
-                      {alerta.estado === 'Sin respuesta' && (
-                        <button
-                          onClick={() => manejarAprobacionAlerta(
-                            {
-                              farm_id:             alerta.farm_id,
-                              crop_disease_status: alerta.diagnostico,
-                              crop_type:           alerta.cultivo,
-                            },
-                            alerta.telefono
-                          )}
-                          className="flex items-center gap-1 text-white bg-amber-600 border border-amber-700 hover:bg-amber-700 px-3 py-1 rounded-md text-xs font-semibold transition-colors"
-                        >
-                          <Send size={13} /> Reenviar
-                        </button>
-                      )}
-                      {alerta.estado === 'Realizado' && (
-                        <span className="flex items-center gap-1 text-emerald-600 text-sm font-bold">
-                          <CheckCircle size={16} /> Realizado
-                        </span>
-                      )}
+                    <div className="flex justify-end items-center gap-2">
+                      {(() => {
+                        // 1. Si ya fue realizado, mostramos el check verde
+                        if (alerta.estado === 'Realizado') {
+                          return (
+                            <span className="flex items-center gap-1 text-emerald-600 text-sm font-bold">
+                              <CheckCircle size={16} /> Realizado
+                            </span>
+                          );
+                        }
+
+                        // 2. Calculamos los minutos reales transcurridos
+                        const minutosTranscurridos = alerta.fechaDate
+                          ? (horaActual - alerta.fechaDate) / 60000
+                          : 0;
+
+                        // 3. REGLA: Si pasaron 5 min o Firebase ya lo marcó como 'Sin respuesta'
+                        if (alerta.estado === 'Sin respuesta' || minutosTranscurridos >= 5) {
+                          return (
+                            <span className="flex items-center gap-1 text-gray-600 text-xs font-bold px-3 py-1 bg-gray-100 rounded-md border border-gray-200">
+                              <X size={14} /> No atentido
+                            </span>
+                          );
+                        }
+
+                        // 4. Si estamos DENTRO de los 5 minutos, mostramos el estado de espera y el botón para reenviar
+                        return (
+                          <>
+                            <span className="flex items-center gap-1 text-yellow-600 text-xs font-semibold px-3 py-1 bg-yellow-50 rounded-md border border-yellow-200">
+                              <Clock size={14} className="animate-spin" /> Esperando...
+                            </span>
+                            <button
+                              onClick={() => manejarAprobacionAlerta(
+                                {
+                                  farm_id:             alerta.farm_id,
+                                  crop_disease_status: alerta.diagnostico,
+                                  crop_type:           alerta.cultivo,
+                                },
+                                alerta.telefono
+                              )}
+                              className="flex items-center gap-1 text-white bg-blue-600 border border-blue-700 hover:bg-blue-700 px-3 py-1 rounded-md text-xs font-semibold transition-colors shadow-sm"
+                            >
+                              <Send size={13} /> Reenviar
+                            </button>
+                          </>
+                        );
+                      })()}
                     </div>
                   </td>
                 </tr>
